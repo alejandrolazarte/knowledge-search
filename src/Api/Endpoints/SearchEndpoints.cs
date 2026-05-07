@@ -80,6 +80,24 @@ static class SearchEndpoints
             return Results.Ok(new IndexResult(added, updated, deleted));
         });
 
+        app.MapGet("/file", (string path) =>
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return Results.BadRequest("Falta parámetro path");
+
+            var fullPath = Path.GetFullPath(path);
+            var docsRoot = Path.GetFullPath(docsDir);
+
+            if (!fullPath.StartsWith(docsRoot, StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest("Ruta fuera del knowledge dir");
+
+            if (!File.Exists(fullPath))
+                return Results.NotFound();
+
+            var content = File.ReadAllText(fullPath);
+            return Results.Text(content, "text/plain; charset=utf-8");
+        });
+
         app.MapGet("/health", () => Results.Ok(new HealthResult("ok")));
     }
 }
