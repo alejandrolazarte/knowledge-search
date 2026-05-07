@@ -54,8 +54,15 @@ static class SkillsEndpoints
 
             var file = Path.Combine(skillsDir, dirName, "SKILL.md");
             if (!File.Exists(file)) return Results.NotFound();
-            return Results.Text(File.ReadAllText(file), "text/plain; charset=utf-8");
+            return Results.Text(StripFrontmatter(File.ReadAllText(file)), "text/plain; charset=utf-8");
         });
+    }
+
+    static string StripFrontmatter(string content)
+    {
+        if (!content.StartsWith("---")) return content;
+        var end = content.IndexOf("\n---", 3);
+        return end == -1 ? content : content[(end + 4)..].TrimStart();
     }
 
     static (string name, string description) ParseFrontmatter(string content)

@@ -20,6 +20,9 @@ src/Api/appsettings.json
 app/node_modules/
 app/dist/
 
+# Local Claude instructions (no publicar)
+CLAUDE.local.md
+
 # OS
 .DS_Store
 Thumbs.db

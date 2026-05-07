@@ -8,6 +8,16 @@ interface Props {
   onClose: () => void
 }
 
+function splitFrontmatter(text: string): { fm: string | null; body: string } {
+  if (!text.startsWith('---')) return { fm: null, body: text }
+  const end = text.indexOf('\n---', 3)
+  if (end === -1) return { fm: null, body: text }
+  return {
+    fm:   text.slice(0, end + 4),
+    body: text.slice(end + 4).trimStart(),
+  }
+}
+
 export function SkillPanel({ skill, onClose }: Props) {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
@@ -58,15 +68,25 @@ export function SkillPanel({ skill, onClose }: Props) {
         <div className="flex-1 overflow-y-auto p-4">
           {loading && <p className="text-gh-muted text-sm">Cargando…</p>}
           {error   && <p className="text-red-400 text-sm">Error al cargar</p>}
-          {!loading && !error && content && (
-            <MarkdownContent className="prose prose-invert prose-sm max-w-none
-              prose-headings:text-gh-text prose-p:text-gh-muted
-              prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-1
-              prose-a:text-gh-accent prose-strong:text-gh-text prose-li:text-gh-muted
-              prose-table:text-xs prose-th:text-gh-text prose-td:text-gh-muted">
-              {content}
-            </MarkdownContent>
-          )}
+          {!loading && !error && content && (() => {
+            const { fm, body } = splitFrontmatter(content)
+            return (
+              <>
+                {fm && (
+                  <pre className="text-xs text-gh-muted font-mono bg-gh-card border border-gh-border rounded p-2 mb-3 whitespace-pre-wrap">
+                    {fm}
+                  </pre>
+                )}
+                <MarkdownContent className="prose prose-invert prose-sm max-w-none
+                  prose-headings:text-gh-text prose-p:text-gh-muted
+                  prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-1
+                  prose-a:text-gh-accent prose-strong:text-gh-text prose-li:text-gh-muted
+                  prose-table:text-xs prose-th:text-gh-text prose-td:text-gh-muted">
+                  {body}
+                </MarkdownContent>
+              </>
+            )
+          })()}
         </div>
       </div>
     </>
