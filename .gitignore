@@ -1,0 +1,25 @@
+# .NET
+src/Api/bin/
+src/Api/obj/
+test/**/bin/
+test/**/obj/
+bin/
+obj/
+*.user
+.vs/
+
+# Base de datos local
+knowledge.db
+knowledge.db-wal
+knowledge.db-shm
+
+# Config local con rutas personales
+src/Api/appsettings.json
+
+# Frontend
+app/node_modules/
+app/dist/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,91 @@
+@import 'highlight.js/styles/github-dark.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+pre code.hljs {
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+/* ── Themes ─────────────────────────────────────────────── */
+:root, [data-theme="github-dark"] {
+  --gh-bg:      #0d1117;
+  --gh-surface: #161b22;
+  --gh-card:    #21262d;
+  --gh-border:  #30363d;
+  --gh-text:    #e6edf3;
+  --gh-muted:   #8b949e;
+  --gh-accent:  #2f81f7;
+}
+
+[data-theme="vscode-dark"] {
+  --gh-bg:      #1e1e1e;
+  --gh-surface: #252526;
+  --gh-card:    #2d2d30;
+  --gh-border:  #3c3c3c;
+  --gh-text:    #d4d4d4;
+  --gh-muted:   #858585;
+  --gh-accent:  #569cd6;
+}
+
+[data-theme="dracula"] {
+  --gh-bg:      #282a36;
+  --gh-surface: #21222c;
+  --gh-card:    #343746;
+  --gh-border:  #44475a;
+  --gh-text:    #f8f8f2;
+  --gh-muted:   #6272a4;
+  --gh-accent:  #bd93f9;
+}
+
+[data-theme="github-light"] {
+  --gh-bg:      #ffffff;
+  --gh-surface: #f6f8fa;
+  --gh-card:    #eaeef2;
+  --gh-border:  #d0d7de;
+  --gh-text:    #1f2328;
+  --gh-muted:   #656d76;
+  --gh-accent:  #0969da;
+}
+
+[data-theme="visual-studio"] {
+  --gh-bg:      #ffffff;
+  --gh-surface: #f5f5f5;
+  --gh-card:    #e8e8e8;
+  --gh-border:  #cccedb;
+  --gh-text:    #1e1e1e;
+  --gh-muted:   #717171;
+  --gh-accent:  #0078d4;
+}
+
+[data-theme="jetbrains"] {
+  --gh-bg:      #2b2b2b;
+  --gh-surface: #3c3f41;
+  --gh-card:    #313335;
+  --gh-border:  #515658;
+  --gh-text:    #a9b7c6;
+  --gh-muted:   #808080;
+  --gh-accent:  #6897bb;
+}
+
+[data-theme="vs-dark"] {
+  --gh-bg:      #1e1e1e;
+  --gh-surface: #2d2d30;
+  --gh-card:    #3e3e42;
+  --gh-border:  #555555;
+  --gh-text:    #dcdcdc;
+  --gh-muted:   #9d9d9d;
+  --gh-accent:  #0078d4;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--gh-border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gh-muted); }
