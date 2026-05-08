@@ -11,9 +11,20 @@ Motor de búsqueda full-text para el directorio `knowledge/` y visor de skills. 
 
 ### Levantar la API + UI
 
+**Con hot reload (recomendado para desarrollo):**
+
 ```bash
-cd knowledge-search/Api
-dotnet run Program.cs
+cd knowledge-search/src/Api
+dotnet watch run
+```
+
+El servidor recarga automáticamente al guardar cambios `.cs`. Workflow recomendado: **terminá todos los cambios antes de guardar** para evitar recargas con código a mitad de refactor.
+
+**Sin watch (one-shot):**
+
+```bash
+cd knowledge-search/src/Api
+dotnet run
 ```
 
 Abre `http://localhost:5111` en el navegador.
