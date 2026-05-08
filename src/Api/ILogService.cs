@@ -2,7 +2,7 @@ using System.Threading.Channels;
 
 namespace KnowledgeSearch;
 
-interface ILogService
+public interface ILogService
 {
     void Append(LogEvent ev);
     List<LogEvent> ReadLast(int n);
