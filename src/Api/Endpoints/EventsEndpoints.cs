@@ -6,10 +6,10 @@ static class EventsEndpoints
 {
     public static void MapEventsRoutes(this WebApplication app)
     {
-        app.MapGet("/log", (LogService log) =>
+        app.MapGet("/log", (ILogService log) =>
             Results.Ok(log.ReadLast(100)));
 
-        app.MapGet("/events", async (LogService log, HttpContext ctx, CancellationToken ct) =>
+        app.MapGet("/events", async (ILogService log, HttpContext ctx, CancellationToken ct) =>
         {
             ctx.Response.Headers.Append("Content-Type",      "text/event-stream");
             ctx.Response.Headers.Append("Cache-Control",     "no-cache");

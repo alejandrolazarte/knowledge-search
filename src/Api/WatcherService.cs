@@ -1,6 +1,6 @@
 namespace KnowledgeSearch;
 
-class WatcherService(string docsDir, string dbPath, LogService log) : BackgroundService
+class WatcherService(string docsDir, string dbPath, ILogService log) : BackgroundService
 {
     readonly Dictionary<string, Timer> _debounce = [];
     readonly object _dlock = new();
@@ -43,7 +43,7 @@ class WatcherService(string docsDir, string dbPath, LogService log) : Background
         }
     }
 
-    void ProcessChange(string path, string type)
+    internal void ProcessChange(string path, string type)
     {
         try
         {
@@ -70,7 +70,7 @@ class WatcherService(string docsDir, string dbPath, LogService log) : Background
         catch { }
     }
 
-    void ProcessDelete(string path)
+    internal void ProcessDelete(string path)
     {
         try
         {
