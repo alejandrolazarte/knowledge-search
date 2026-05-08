@@ -23,7 +23,13 @@ class WatcherService(string docsDir, string dbPath, ILogService log) : Backgroun
         watcher.Renamed += (_, e) =>
         {
             if (IsMd(e.OldFullPath)) ProcessDelete(e.OldFullPath);
-            if (IsMd(e.FullPath))    Debounce(e.FullPath, "added");
+            if (IsMd(e.FullPath))
+            {
+                // Si el origen era un .md → rename real entre docs → "added" en destino
+                // Si el origen era un temp (no .md) → write atómico sobre archivo existente → "updated"
+                var type = IsMd(e.OldFullPath) ? "added" : "updated";
+                Debounce(e.FullPath, type);
+            }
         };
 
         ct.Register(() => watcher.Dispose());
@@ -52,9 +58,12 @@ class WatcherService(string docsDir, string dbPath, ILogService log) : Backgroun
             using var con = DbService.Open(dbPath);
             DbService.EnsureSchema(con);
 
+            // No comparamos mtime aquí — el watcher ya garantiza que hubo un cambio.
+            // El mtime check existe en el indexador batch (/index) para evitar re-indexar
+            // archivos intactos, pero en el watcher sería un falso negativo para ediciones
+            // atómicas (write-to-temp + rename) que preservan el mtime original.
             long  mtime  = new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds();
             long? stored = DbService.QueryLong(con, "SELECT last_modified FROM docs_meta WHERE path=@p", path);
-            if (stored == mtime) return;
 
             if (stored is not null)
                 DbService.ExecP(con, "DELETE FROM docs WHERE path=@p", path);
