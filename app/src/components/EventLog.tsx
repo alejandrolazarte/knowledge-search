@@ -27,12 +27,23 @@ export function EventLog({ collapsed }: Props) {
 
   // SSE: eventos en tiempo real
   useEffect(() => {
+    const syncLog = () =>
+      fetch('/log')
+        .then(r => r.json())
+        .then((data: LogEvent[]) => setEvents(data))
+        .catch(() => {})
+
     const es = new EventSource('/events')
+
     es.onmessage = e => {
       const ev: LogEvent = JSON.parse(e.data)
       setEvents(prev => [...prev.slice(-99), ev])
       setUnread(n => n + 1)
     }
+
+    // Al reconectar re-sincroniza el log para no perder eventos ocurridos durante el corte
+    es.onerror = () => syncLog()
+
     return () => es.close()
   }, [])
 
