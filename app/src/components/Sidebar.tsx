@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { THEMES } from '../hooks/useTheme'
 import type { Theme } from '../hooks/useTheme'
 import type { FontSize } from '../hooks/useFontSize'
+import { EventLog } from './EventLog'
 
 type View = 'search' | 'skills'
 
@@ -53,6 +54,10 @@ export function Sidebar({ view, onView, theme, onTheme, fontSize, onFontSize }: 
           active={view === 'search'} collapsed={collapsed} onClick={() => onView('search')} />
         <NavItem icon={<SkillsIcon />} label="Skills"
           active={view === 'skills'} collapsed={collapsed} onClick={() => onView('skills')} />
+
+        <div className="pt-1 mt-1 border-t border-gh-border/50">
+          <EventLog collapsed={collapsed} />
+        </div>
       </nav>
 
       <div className="px-2 py-3 border-t border-gh-border space-y-1">

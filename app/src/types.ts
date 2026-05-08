@@ -11,3 +11,9 @@ export interface Skill {
   description: string
   dirName:     string
 }
+
+export interface LogEvent {
+  ts:   string
+  type: 'added' | 'updated' | 'deleted'
+  path: string
+}
