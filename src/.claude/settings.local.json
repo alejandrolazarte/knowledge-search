@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk ls *)",
+      "Bash(rtk read *)",
+      "Read(//d/knowledge-search/**)",
+      "Bash(dotnet run *)",
+      "Bash(rtk curl *)",
+      "Bash(netstat -ano)",
+      "Bash(kill -f 6436)",
+      "Bash(taskkill //PID 6436 //F)",
+      "Bash(rtk git *)",
+      "Bash(git -C D:/Documentation ls-files)",
+      "Bash(rtk npm *)",
+      "Bash(./node_modules/.bin/vite build *)",
+      "Bash(pushd D:/knowledge-search/app)",
+      "Bash(npm install *)",
+      "Bash(popd)",
+      "Bash(git -C D:/knowledge-search rm FEATURES.md)",
+      "Bash(taskkill //PID 4412 //F)",
+      "Bash(taskkill //PID 17836 //F)",
+      "Bash(taskkill /F /IM dotnet.exe)",
+      "Bash(cd /d D:\\\\knowledge-search\\\\src\\\\Api)",
+      "Bash(start /B dotnet run)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(e\\) for e in d[-3:]]\")",
+      "PowerShell(Stop-Process -Id 24708 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Name \"Api\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "Bash(grep -E \"\\\\.cs$|GlobalUsings\")",
+      "Bash(rtk grep *)",
+      "Bash(rtk dotnet *)",
+      "Bash(taskkill /PID 12640 /F)"
+    ]
+  }
+}

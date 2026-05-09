@@ -1,0 +1,101 @@
+<h2>Diseño del modal</h2>
+<p class="subtitle">¿Cómo se ve el modal al abrirse? Hacé click para seleccionar</p>
+
+<div class="cards">
+
+  <!-- Option A: Modal con header compacto -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="position:relative;height:200px;background:#0d1117;border:1px solid #30363d;border-radius:6px;overflow:hidden">
+        <!-- fondo apagado -->
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.65);z-index:1"></div>
+        <!-- Modal -->
+        <div style="position:absolute;top:12px;left:12px;right:12px;bottom:12px;z-index:2;background:#161b22;border:1px solid #30363d;border-radius:8px;display:flex;flex-direction:column;overflow:hidden">
+          <!-- Header compacto -->
+          <div style="padding:8px 12px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between;background:#0d1117">
+            <div>
+              <div style="font-size:9px;color:#388bfd;font-family:monospace">wiki/dotnet/roslyn-analyzers.md</div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <div style="font-size:8px;color:#6e7681;background:#21262d;border:1px solid #30363d;border-radius:3px;padding:2px 5px">Copiar ruta</div>
+              <div style="width:14px;height:14px;background:#21262d;border:1px solid #30363d;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#6e7681">✕</div>
+            </div>
+          </div>
+          <!-- Contenido -->
+          <div style="flex:1;overflow:hidden;padding:10px 12px">
+            <div style="height:10px;background:#c9d1d9;border-radius:2px;width:55%;margin-bottom:8px"></div>
+            <div style="height:6px;background:#21262d;border-radius:2px;width:90%;margin-bottom:4px"></div>
+            <div style="height:6px;background:#21262d;border-radius:2px;width:75%;margin-bottom:4px"></div>
+            <div style="height:6px;background:#21262d;border-radius:2px;width:85%;margin-bottom:8px"></div>
+            <div style="height:8px;background:#8b949e;border-radius:2px;width:40%;margin-bottom:6px"></div>
+            <div style="background:#0d1117;border-radius:4px;padding:6px;margin-bottom:8px">
+              <div style="height:5px;background:#388bfd;border-radius:2px;width:60%;margin-bottom:3px;opacity:0.7"></div>
+              <div style="height:5px;background:#21262d;border-radius:2px;width:80%;margin-bottom:3px"></div>
+              <div style="height:5px;background:#21262d;border-radius:2px;width:55%"></div>
+            </div>
+            <div style="height:6px;background:#21262d;border-radius:2px;width:80%;margin-bottom:4px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Header minimalista</h3>
+      <p>Path del archivo en azul, botón "Copiar ruta" y X para cerrar. Sin título grande. Todo el espacio para el contenido.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Modal con título y breadcrumb -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="position:relative;height:200px;background:#0d1117;border:1px solid #30363d;border-radius:6px;overflow:hidden">
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.65);z-index:1"></div>
+        <div style="position:absolute;top:12px;left:12px;right:12px;bottom:12px;z-index:2;background:#161b22;border:1px solid #30363d;border-radius:8px;display:flex;flex-direction:column;overflow:hidden">
+          <!-- Header con título -->
+          <div style="padding:8px 12px 6px;border-bottom:1px solid #30363d;background:#0d1117">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+              <div style="font-size:10px;color:#c9d1d9;font-weight:600">roslyn-analyzers.md</div>
+              <div style="width:14px;height:14px;background:#21262d;border:1px solid #30363d;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#6e7681">✕</div>
+            </div>
+            <div style="font-size:8px;color:#388bfd;font-family:monospace">wiki/dotnet/roslyn-analyzers.md</div>
+          </div>
+          <!-- Contenido -->
+          <div style="flex:1;overflow:hidden;padding:10px 12px">
+            <div style="height:10px;background:#c9d1d9;border-radius:2px;width:55%;margin-bottom:8px"></div>
+            <div style="height:6px;background:#21262d;border-radius:2px;width:90%;margin-bottom:4px"></div>
+            <div style="height:6px;background:#21262d;border-radius:2px;width:75%;margin-bottom:4px"></div>
+            <div style="height:6px;background:#21262d;border-radius:2px;width:85%;margin-bottom:8px"></div>
+            <div style="background:#0d1117;border-radius:4px;padding:6px;margin-bottom:8px">
+              <div style="height:5px;background:#388bfd;border-radius:2px;width:60%;margin-bottom:3px;opacity:0.7"></div>
+              <div style="height:5px;background:#21262d;border-radius:2px;width:80%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Nombre + path</h3>
+      <p>Nombre del archivo como título, path completo abajo en monospace. Más contexto de un vistazo.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>Botón trigger en el resultado</h3>
+  <p class="subtitle">El botón que abre el modal se agrega junto a los botones existentes en cada card de resultado</p>
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;margin-top:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:12px;color:#c9d1d9;font-weight:500">roslyn-analyzers</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <!-- Botón nuevo: ojo -->
+        <div style="padding:3px 7px;background:#21262d;border:1px solid #388bfd;border-radius:3px;font-size:9px;color:#388bfd;cursor:pointer">👁 Ver</div>
+        <!-- Botón copy existente -->
+        <div style="padding:2px;background:#21262d;border:1px solid #30363d;border-radius:3px;font-size:9px;color:#6e7681">⧉</div>
+        <div style="background:#21262d;border:1px solid #30363d;border-radius:3px;padding:2px 5px;font-size:8px;color:#6e7681">section</div>
+      </div>
+    </div>
+    <div style="font-size:9px;color:#388bfd;font-family:monospace;margin-bottom:6px">wiki/dotnet/roslyn-analyzers.md:1</div>
+    <div style="height:5px;background:#21262d;border-radius:2px;width:90%;margin-bottom:3px"></div>
+    <div style="height:5px;background:#21262d;border-radius:2px;width:70%"></div>
+  </div>
+</div>

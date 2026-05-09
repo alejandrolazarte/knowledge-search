@@ -26,3 +26,8 @@ CLAUDE.local.md
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime logs
+.api.log
+.api.err
+knowledge.log
