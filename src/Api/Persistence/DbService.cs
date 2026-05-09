@@ -2,57 +2,290 @@ using Microsoft.Data.Sqlite;
 
 namespace KnowledgeSearch;
 
-internal static class DbService
+internal sealed class DbService : IDbService, IDisposable
 {
     private const int SchemaVersion = 3;
 
-    public static SqliteConnection Open(string path)
+    private const string InsertSql =
+        "INSERT INTO docs(title,section,content,path,line) " +
+        "VALUES(@title,@section,@content,@path,@line)";
+
+    private const string SearchSql =
+        "SELECT title,section,path,line,content " +
+        "FROM docs WHERE docs MATCH @query " +
+        "ORDER BY bm25(docs,10,5,1) LIMIT @limit";
+
+    private const string GetStoredModifiedAtSql =
+        "SELECT last_modified FROM docs_meta WHERE path=@path";
+
+    private const string UpsertMetaSql =
+        "INSERT INTO docs_meta(path,last_modified) VALUES(@path,@modifiedAt) " +
+        "ON CONFLICT(path) DO UPDATE SET last_modified=excluded.last_modified";
+
+    private readonly SqliteConnection _connection;
+    private readonly IReadOnlyList<string> _roots;
+
+    public DbService(string dbPath, IReadOnlyList<string> roots)
     {
-        var connection = new SqliteConnection($"Data Source={path}");
-        connection.Open();
-        Execute(connection, "PRAGMA journal_mode=WAL");
-        Execute(connection, "PRAGMA cache_size=-32000");
-        Execute(connection, "PRAGMA synchronous=NORMAL");
-        return connection;
+        _roots = roots;
+        _connection = new SqliteConnection($"Data Source={dbPath}");
+        _connection.Open();
+        ApplyPragmas();
+        EnsureSchema();
     }
 
-    public static void EnsureSchema(SqliteConnection connection)
-    {
-        Execute(connection, "CREATE TABLE IF NOT EXISTS schema_info(version INTEGER NOT NULL)");
-        var version = QuerySchemaVersion(connection);
+    // ── IDbService ────────────────────────────────────────────────────────────
 
-        if (version == SchemaVersion)
+    /// <inheritdoc/>
+    public IReadOnlyList<SearchResult> Search(
+        string query,
+        int limit,
+        SearchMode modes = SearchMode.Default,
+        IReadOnlyList<string>? roots = null)
+    {
+        var ftsQuery = BuildFtsQuery(query, modes);
+        var rawResults = new List<SearchResult>();
+
+        using var command = new SqliteCommand(SearchSql, _connection);
+        command.Parameters.AddWithValue("@query", ftsQuery);
+        command.Parameters.AddWithValue("@limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var path = reader.GetString(2);
+            rawResults.Add(new SearchResult(
+                reader.GetString(0),
+                reader.GetString(1),
+                path,
+                reader.GetInt32(3),
+                reader.GetString(4),
+                GetRoot(path)));
+        }
+
+        if (roots is null || roots.Count == 0)
+        {
+            return rawResults;
+        }
+
+        return rawResults
+            .Where(result => roots.Contains(result.Root, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public IndexResult IndexDirectories()
+    {
+        var separator = Path.DirectorySeparatorChar;
+
+        var files = _roots
+            .Where(Directory.Exists)
+            .SelectMany(root =>
+                Directory.EnumerateFiles(root, "*.md",  SearchOption.AllDirectories)
+                .Concat(Directory.EnumerateFiles(root, "*.mkd", SearchOption.AllDirectories)))
+            .Select(Path.GetFullPath)
+            .Where(filePath =>
+                !filePath.Contains($"{separator}node_modules{separator}") &&
+                !filePath.Contains($"{separator}.git{separator}"))
+            .ToHashSet();
+
+        var indexed = new HashSet<string>();
+        using (var command = new SqliteCommand("SELECT path FROM docs_meta", _connection))
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                indexed.Add(reader.GetString(0));
+            }
+        }
+
+        int deleted = 0, added = 0, updated = 0;
+
+        var toDelete = indexed.Except(files).ToList();
+        if (toDelete.Count > 0)
+        {
+            using var deleteTransaction = _connection.BeginTransaction();
+            foreach (var removed in toDelete)
+            {
+                using (var docsCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, deleteTransaction))
+                {
+                    docsCmd.Parameters.AddWithValue("@path", removed);
+                    docsCmd.ExecuteNonQuery();
+                }
+                using (var metaCmd = new SqliteCommand("DELETE FROM docs_meta WHERE path=@path", _connection, deleteTransaction))
+                {
+                    metaCmd.Parameters.AddWithValue("@path", removed);
+                    metaCmd.ExecuteNonQuery();
+                }
+                deleted++;
+            }
+            deleteTransaction.Commit();
+        }
+
+        foreach (var file in files)
+        {
+            var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeSeconds();
+            long? stored;
+            using (var command = new SqliteCommand(GetStoredModifiedAtSql, _connection))
+            {
+                command.Parameters.AddWithValue("@path", file);
+                var result = command.ExecuteScalar();
+                stored = result is null or DBNull ? null : Convert.ToInt64(result);
+            }
+
+            if (stored == modifiedAt)
+            {
+                continue;
+            }
+
+            using var transaction = _connection.BeginTransaction();
+            using (var deleteCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
+            {
+                deleteCmd.Parameters.AddWithValue("@path", file);
+                deleteCmd.ExecuteNonQuery();
+            }
+
+            IndexFileSections(file, Path.GetFileNameWithoutExtension(file), transaction);
+
+            using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
+            {
+                metaCmd.Parameters.AddWithValue("@path", file);
+                metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
+                metaCmd.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+
+            if (stored is null)
+            {
+                added++;
+            }
+            else
+            {
+                updated++;
+            }
+        }
+
+        return new IndexResult(added, updated, deleted);
+    }
+
+    /// <inheritdoc/>
+    public bool IsPathAllowed(string fullPath) =>
+        _roots.Any(root =>
+            fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase));
+
+    /// <inheritdoc/>
+    public void ReindexFile(string path)
+    {
+        if (!File.Exists(path))
         {
             return;
         }
 
-        Execute(connection, "DROP TABLE IF EXISTS docs");
-        Execute(connection, "DROP TABLE IF EXISTS docs_meta");
-        Execute(connection, """
-            CREATE VIRTUAL TABLE docs USING fts5(
-                title, section, content,
-                path UNINDEXED, line UNINDEXED,
-                tokenize='trigram')
-            """);
-        Execute(connection, "CREATE TABLE docs_meta(path TEXT PRIMARY KEY, last_modified INTEGER NOT NULL)");
+        var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds();
 
-        if (version is null)
+        using var transaction = _connection.BeginTransaction();
+
+        using (var deleteCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
         {
-            Execute(connection, $"INSERT INTO schema_info(version) VALUES({SchemaVersion})");
+            deleteCmd.Parameters.AddWithValue("@path", path);
+            deleteCmd.ExecuteNonQuery();
         }
-        else
+
+        IndexFileSections(path, Path.GetFileNameWithoutExtension(path), transaction);
+
+        using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
         {
-            Execute(connection, $"UPDATE schema_info SET version={SchemaVersion}");
+            metaCmd.Parameters.AddWithValue("@path", path);
+            metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
+            metaCmd.ExecuteNonQuery();
         }
+
+        transaction.Commit();
     }
 
-    // ── Indexing ──────────────────────────────────────────────────────────
+    /// <inheritdoc/>
+    public void DeleteFile(string path)
+    {
+        using var transaction = _connection.BeginTransaction();
 
-    public static void IndexFile(SqliteConnection connection, string path, string title)
+        using (var docsCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
+        {
+            docsCmd.Parameters.AddWithValue("@path", path);
+            docsCmd.ExecuteNonQuery();
+        }
+
+        using (var metaCmd = new SqliteCommand("DELETE FROM docs_meta WHERE path=@path", _connection, transaction))
+        {
+            metaCmd.Parameters.AddWithValue("@path", path);
+            metaCmd.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<string> GetRootNames() =>
+        _roots.Select(root => Path.GetFileName(root)!).ToList();
+
+    /// <inheritdoc/>
+    public void Dispose() => _connection.Dispose();
+
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    internal static string BuildFtsQuery(string query, SearchMode modes = SearchMode.Default)
+    {
+        var words = query.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 1)
+        {
+            return "\"" + words[0].Replace("\"", "\"\"") + "\"";
+        }
+
+        var escaped = words.Select(word => word.Replace("\"", "\"\"")).ToArray();
+        var parts = new List<string>();
+
+        if (modes.HasFlag(SearchMode.Phrase))
+        {
+            parts.Add("\"" + string.Join(" ", escaped) + "\"");
+        }
+
+        if (modes.HasFlag(SearchMode.And))
+        {
+            parts.Add("(" + string.Join(" AND ", escaped) + ")");
+        }
+
+        if (modes.HasFlag(SearchMode.Or))
+        {
+            foreach (var word in escaped)
+            {
+                parts.Add("\"" + word + "\"");
+            }
+        }
+
+        return parts.Count > 0
+            ? string.Join(" OR ", parts)
+            : "\"" + string.Join(" ", escaped) + "\"";
+    }
+
+    private string GetRoot(string path)
+    {
+        foreach (var root in _roots)
+        {
+            if (path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.GetFileName(root)!;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private void IndexFileSections(string path, string title, SqliteTransaction transaction)
     {
         var lines = File.ReadAllLines(path);
         var buffer = new List<string>();
-        var start = 1;
+        var startLine = 1;
         var section = title;
 
         void Flush()
@@ -62,19 +295,18 @@ internal static class DbService
                 return;
             }
 
-            if (buffer.All(l => string.IsNullOrWhiteSpace(l) || l.TrimStart().StartsWith('#')))
+            if (buffer.All(line => string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#')))
             {
                 return;
             }
 
-            using var cmd = new SqliteCommand(
-                "INSERT INTO docs(title,section,content,path,line) VALUES(@title,@section,@content,@path,@line)", connection);
-            cmd.Parameters.AddWithValue("@title",   title);
-            cmd.Parameters.AddWithValue("@section", section);
-            cmd.Parameters.AddWithValue("@content", string.Join("\n", buffer).Trim());
-            cmd.Parameters.AddWithValue("@path",    path);
-            cmd.Parameters.AddWithValue("@line",    start);
-            cmd.ExecuteNonQuery();
+            using var command = new SqliteCommand(InsertSql, _connection, transaction);
+            command.Parameters.AddWithValue("@title",   title);
+            command.Parameters.AddWithValue("@section", section);
+            command.Parameters.AddWithValue("@content", string.Join("\n", buffer).Trim());
+            command.Parameters.AddWithValue("@path",    path);
+            command.Parameters.AddWithValue("@line",    startLine);
+            command.ExecuteNonQuery();
             buffer.Clear();
         }
 
@@ -83,8 +315,8 @@ internal static class DbService
             if (lines[i].StartsWith('#'))
             {
                 Flush();
-                start   = i + 1;
-                section = lines[i].TrimStart('#').Trim();
+                startLine = i + 1;
+                section   = lines[i].TrimStart('#').Trim();
             }
 
             buffer.Add(lines[i]);
@@ -93,46 +325,52 @@ internal static class DbService
         Flush();
     }
 
-    public static string BuildFtsQuery(string query)
-        => query.Trim().Contains(' ')
-            ? string.Join(" OR ", query.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Select(w => "\"" + w.Replace("\"", "\"\"") + "\""))
-            : "\"" + query.Replace("\"", "\"\"") + "\"";
-
-    // ── Helpers ────────────────────────────────────────────────────────────
-
-    public static void Execute(SqliteConnection connection, string sql)
+    private void ApplyPragmas()
     {
-        using var command = new SqliteCommand(sql, connection);
+        ExecuteSql("PRAGMA journal_mode=WAL");
+        ExecuteSql("PRAGMA cache_size=-32000");
+        ExecuteSql("PRAGMA synchronous=NORMAL");
+    }
+
+    private void EnsureSchema()
+    {
+        ExecuteSql("CREATE TABLE IF NOT EXISTS schema_info(version INTEGER NOT NULL)");
+        var version = QuerySchemaVersion();
+
+        if (version == SchemaVersion)
+        {
+            return;
+        }
+
+        ExecuteSql("DROP TABLE IF EXISTS docs");
+        ExecuteSql("DROP TABLE IF EXISTS docs_meta");
+        ExecuteSql("""
+            CREATE VIRTUAL TABLE docs USING fts5(
+                title, section, content,
+                path UNINDEXED, line UNINDEXED,
+                tokenize='trigram')
+            """);
+        ExecuteSql("CREATE TABLE docs_meta(path TEXT PRIMARY KEY, last_modified INTEGER NOT NULL)");
+
+        if (version is null)
+        {
+            ExecuteSql($"INSERT INTO schema_info(version) VALUES({SchemaVersion})");
+        }
+        else
+        {
+            ExecuteSql($"UPDATE schema_info SET version={SchemaVersion}");
+        }
+    }
+
+    private void ExecuteSql(string sql)
+    {
+        using var command = new SqliteCommand(sql, _connection);
         command.ExecuteNonQuery();
     }
 
-    public static void Execute(SqliteConnection connection, string sql, string path)
+    private long? QuerySchemaVersion()
     {
-        using var command = new SqliteCommand(sql, connection);
-        command.Parameters.AddWithValue("@path", path);
-        command.ExecuteNonQuery();
-    }
-
-    public static void Execute(SqliteConnection connection, string sql, string path, long modifiedAt)
-    {
-        using var command = new SqliteCommand(sql, connection);
-        command.Parameters.AddWithValue("@path",       path);
-        command.Parameters.AddWithValue("@modifiedAt", modifiedAt);
-        command.ExecuteNonQuery();
-    }
-
-    public static long? QueryFirstLong(SqliteConnection connection, string sql, string path)
-    {
-        using var command = new SqliteCommand(sql, connection);
-        command.Parameters.AddWithValue("@path", path);
-        var result = command.ExecuteScalar();
-        return result is null or DBNull ? null : Convert.ToInt64(result);
-    }
-
-    private static long? QuerySchemaVersion(SqliteConnection connection)
-    {
-        using var command = new SqliteCommand("SELECT version FROM schema_info LIMIT 1", connection);
+        using var command = new SqliteCommand("SELECT version FROM schema_info LIMIT 1", _connection);
         var result = command.ExecuteScalar();
         return result is null or DBNull ? null : Convert.ToInt64(result);
     }
