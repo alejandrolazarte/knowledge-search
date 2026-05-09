@@ -26,8 +26,10 @@ internal static class AppConfig
         var skillsDir = Environment.GetEnvironmentVariable("SKILLS_DIR")
                      ?? Cfg("SkillsDir",    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills"));
 
-        var indexHtmlPath = Path.Combine(AppContext.BaseDirectory, "index.html");
-        var staticDir     = Path.GetDirectoryName(indexHtmlPath)!;
+        var indexHtmlPath = File.Exists(Path.Combine(Directory.GetCurrentDirectory(), "index.html"))
+            ? Path.Combine(Directory.GetCurrentDirectory(), "index.html")
+            : Path.Combine(AppContext.BaseDirectory, "index.html");
+        var staticDir = Path.GetDirectoryName(indexHtmlPath)!;
 
         return (dbPath, docsDir, skillsDir, indexHtmlPath, staticDir);
     }
