@@ -11,18 +11,29 @@ namespace Api.Tests;
 
 public class When_LogEndpointIsRequested : IDisposable
 {
-    readonly Mock<ILogService> _mockLog = new();
-    readonly WebApplicationFactory<Program> _factory;
-    readonly HttpClient _client;
+    private readonly Mock<ILogService> _mockLog = new();
+    private readonly Mock<IDbService>  _mockDb  = new();
+    private readonly WebApplicationFactory<Program> _factory;
+    private readonly HttpClient _client;
 
     public When_LogEndpointIsRequested()
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureServices(services =>
             {
-                var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ILogService));
-                if (descriptor != null) { services.Remove(descriptor); }
+                var logDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ILogService));
+                if (logDescriptor != null)
+                {
+                    services.Remove(logDescriptor);
+                }
                 services.AddSingleton(_mockLog.Object);
+
+                var dbDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IDbService));
+                if (dbDescriptor != null)
+                {
+                    services.Remove(dbDescriptor);
+                }
+                services.AddSingleton(_mockDb.Object);
             }));
         _client = _factory.CreateClient();
     }
