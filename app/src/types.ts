@@ -4,6 +4,7 @@ export interface SearchResult {
   path:    string
   line:    number
   content: string
+  root:    string
 }
 
 export interface Skill {
