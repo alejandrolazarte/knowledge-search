@@ -1,6 +1,6 @@
 namespace KnowledgeSearch;
 
-internal interface IDbService : IDisposable
+internal interface IDbService
 {
     /// <summary>
     /// Busca documentos usando cascade phrase → AND → OR según <paramref name="modes"/>.
