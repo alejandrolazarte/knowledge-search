@@ -2,10 +2,10 @@ namespace KnowledgeSearch;
 
 internal sealed class WatcherService(string docsDir, string dbPath, ILogService log) : BackgroundService
 {
-    readonly Dictionary<string, Timer> _debounce = [];
-    readonly object _dlock = new();
+    private readonly Dictionary<string, Timer> _debounce = [];
+    private readonly object _debounceLock = new();
 
-    protected override Task ExecuteAsync(CancellationToken ct)
+    protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
         if (!Directory.Exists(docsDir))
         {
@@ -14,69 +14,53 @@ internal sealed class WatcherService(string docsDir, string dbPath, ILogService 
 
         var watcher = new FileSystemWatcher(docsDir)
         {
-            Filter               = "*",
+            Filter                = "*",
             IncludeSubdirectories = true,
-            EnableRaisingEvents  = true,
-            NotifyFilter         = NotifyFilters.LastWrite | NotifyFilters.FileName,
+            EnableRaisingEvents   = true,
+            NotifyFilter          = NotifyFilters.LastWrite | NotifyFilters.FileName,
         };
 
-        watcher.Changed += (_, e) =>
-        {
-            if (IsMd(e.FullPath))
-            {
-                Debounce(e.FullPath, "updated");
-            }
-        };
-        watcher.Created += (_, e) =>
-        {
-            if (IsMd(e.FullPath))
-            {
-                Debounce(e.FullPath, "added");
-            }
-        };
-        watcher.Deleted += (_, e) =>
-        {
-            if (IsMd(e.FullPath))
-            {
-                ProcessDelete(e.FullPath);
-            }
-        };
+        watcher.Changed += (_, e) => { if (IsMd(e.FullPath)) { Debounce(e.FullPath, "updated"); } };
+        watcher.Created += (_, e) => { if (IsMd(e.FullPath)) { Debounce(e.FullPath, "added"); } };
+        watcher.Deleted += (_, e) => { if (IsMd(e.FullPath)) { ProcessDelete(e.FullPath); } };
         watcher.Renamed += (_, e) =>
         {
             if (IsMd(e.OldFullPath))
             {
                 ProcessDelete(e.OldFullPath);
             }
+
             if (IsMd(e.FullPath))
             {
-                // Si el origen era un .md → rename real entre docs → "added" en destino
-                // Si el origen era un temp (no .md) → write atómico sobre archivo existente → "updated"
-                var type = IsMd(e.OldFullPath) ? "added" : "updated";
-                Debounce(e.FullPath, type);
+                // Real rename between .md files → "added" at destination.
+                // Atomic write (temp → target rename) where source was not .md → "updated".
+                var eventType = IsMd(e.OldFullPath) ? "added" : "updated";
+                Debounce(e.FullPath, eventType);
             }
         };
 
-        ct.Register(() => watcher.Dispose());
-        return Task.Delay(Timeout.Infinite, ct);
+        cancellationToken.Register(() => watcher.Dispose());
+        return Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
-    static bool IsMd(string path) =>
+    private static bool IsMd(string path) =>
         path.EndsWith(".md",  StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(".mkd", StringComparison.OrdinalIgnoreCase);
 
-    void Debounce(string path, string type)
+    private void Debounce(string path, string eventType)
     {
-        lock (_dlock)
+        lock (_debounceLock)
         {
-            if (_debounce.TryGetValue(path, out var t))
+            if (_debounce.TryGetValue(path, out var existing))
             {
-                t.Dispose();
+                existing.Dispose();
             }
-            _debounce[path] = new Timer(_ => ProcessChange(path, type), null, 500, Timeout.Infinite);
+
+            _debounce[path] = new Timer(_ => ProcessChange(path, eventType), null, 500, Timeout.Infinite);
         }
     }
 
-    internal void ProcessChange(string path, string type)
+    internal void ProcessChange(string path, string eventType)
     {
         try
         {
@@ -85,43 +69,48 @@ internal sealed class WatcherService(string docsDir, string dbPath, ILogService 
                 return;
             }
 
-            using var con = DbService.Open(dbPath);
-            DbService.EnsureSchema(con);
+            using var connection = DbService.Open(dbPath);
+            DbService.EnsureSchema(connection);
 
-            // No comparamos mtime aquí — el watcher ya garantiza que hubo un cambio.
-            // El mtime check existe en el indexador batch (/index) para evitar re-indexar
-            // archivos intactos, pero en el watcher sería un falso negativo para ediciones
-            // atómicas (write-to-temp + rename) que preservan el mtime original.
-            long  mtime  = new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds();
-            long? stored = DbService.QueryLong(con, "SELECT last_modified FROM docs_meta WHERE path=@p", path);
+            // Mtime check is intentionally skipped here — the watcher already guarantees
+            // a change occurred. Checking mtime would cause false negatives for atomic writes
+            // (write-to-temp + rename) which preserve the original file's LastWriteTime.
+            var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds();
+            var stored     = DbService.QueryFirstLong(connection, "SELECT last_modified FROM docs_meta WHERE path=@path", path);
 
             if (stored is not null)
             {
-                DbService.ExecP(con, "DELETE FROM docs WHERE path=@p", path);
+                DbService.Execute(connection, "DELETE FROM docs WHERE path=@path", path);
             }
 
-            DbService.IndexFile(con, path, Path.GetFileNameWithoutExtension(path));
-            DbService.ExecP2(con,
-                "INSERT INTO docs_meta(path,last_modified) VALUES(@p,@m) ON CONFLICT(path) DO UPDATE SET last_modified=excluded.last_modified",
-                path, mtime);
+            DbService.IndexFile(connection, path, Path.GetFileNameWithoutExtension(path));
+            DbService.Execute(connection,
+                "INSERT INTO docs_meta(path,last_modified) VALUES(@path,@modifiedAt) ON CONFLICT(path) DO UPDATE SET last_modified=excluded.last_modified",
+                path, modifiedAt);
 
-            var rel = Path.GetRelativePath(docsDir, path).Replace('\\', '/');
-            log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), type, rel));
+            var relativePath = Path.GetRelativePath(docsDir, path).Replace('\\', '/');
+            log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), eventType, relativePath));
         }
-        catch { }
+        catch (Exception)
+        {
+            // Best-effort: watcher operations must not crash the host.
+        }
     }
 
     internal void ProcessDelete(string path)
     {
         try
         {
-            using var con = DbService.Open(dbPath);
-            DbService.ExecP(con, "DELETE FROM docs      WHERE path=@p", path);
-            DbService.ExecP(con, "DELETE FROM docs_meta WHERE path=@p", path);
+            using var connection = DbService.Open(dbPath);
+            DbService.Execute(connection, "DELETE FROM docs      WHERE path=@path", path);
+            DbService.Execute(connection, "DELETE FROM docs_meta WHERE path=@path", path);
 
-            var rel = Path.GetRelativePath(docsDir, path).Replace('\\', '/');
-            log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), "deleted", rel));
+            var relativePath = Path.GetRelativePath(docsDir, path).Replace('\\', '/');
+            log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), "deleted", relativePath));
         }
-        catch { }
+        catch (Exception)
+        {
+            // Best-effort: watcher operations must not crash the host.
+        }
     }
 }
