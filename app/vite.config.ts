@@ -13,6 +13,8 @@ export default defineConfig({
       '/search': 'http://localhost:5111',
       '/skills': 'http://localhost:5111',
       '/index':  'http://localhost:5111',
+      '/file':   'http://localhost:5111',
+      '/image':  'http://localhost:5111',
       '/log':    'http://localhost:5111',
       '/events': { target: 'http://localhost:5111', changeOrigin: true },
     }

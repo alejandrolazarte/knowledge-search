@@ -136,6 +136,40 @@ internal static class SearchEndpoints
             return Results.Text(File.ReadAllText(fullPath), "text/plain; charset=utf-8");
         });
 
+        app.MapGet("/image", (string path) =>
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return Results.BadRequest("Falta parámetro path");
+            }
+
+            var fullPath = Path.GetFullPath(path);
+            var docsRoot = Path.GetFullPath(docsDir);
+
+            if (!fullPath.StartsWith(docsRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.BadRequest("Ruta fuera del knowledge dir");
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                return Results.NotFound();
+            }
+
+            var contentType = Path.GetExtension(fullPath).ToLowerInvariant() switch
+            {
+                ".png"  => "image/png",
+                ".jpg"  => "image/jpeg",
+                ".jpeg" => "image/jpeg",
+                ".gif"  => "image/gif",
+                ".svg"  => "image/svg+xml",
+                ".webp" => "image/webp",
+                _       => "application/octet-stream",
+            };
+
+            return Results.File(File.ReadAllBytes(fullPath), contentType);
+        });
+
         app.MapGet("/health", () => Results.Ok(new HealthResult("ok")));
     }
 }

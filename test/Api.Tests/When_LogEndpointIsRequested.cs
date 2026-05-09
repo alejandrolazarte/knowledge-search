@@ -21,7 +21,7 @@ public class When_LogEndpointIsRequested : IDisposable
             builder.ConfigureServices(services =>
             {
                 var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ILogService));
-                if (descriptor != null) services.Remove(descriptor);
+                if (descriptor != null) { services.Remove(descriptor); }
                 services.AddSingleton(_mockLog.Object);
             }));
         _client = _factory.CreateClient();
@@ -47,5 +47,9 @@ public class When_LogEndpointIsRequested : IDisposable
         _mockLog.Verify(l => l.ReadLast(100), Times.Once);
     }
 
-    public void Dispose() => _factory.Dispose();
+    public void Dispose()
+    {
+        _factory.Dispose();
+        GC.SuppressFinalize(this);
+    }
 }
