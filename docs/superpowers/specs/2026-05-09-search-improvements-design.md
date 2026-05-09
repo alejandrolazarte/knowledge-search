@@ -221,6 +221,7 @@ GET /search?q=deploy&limit=10&modes=or                 → OR suelto (comportami
 [Flags]
 internal enum SearchMode
 {
+    None    = 0,
     Phrase  = 1,
     And     = 2,
     Or      = 4,
