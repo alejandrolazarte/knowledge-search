@@ -38,5 +38,6 @@ public class When_WatcherServiceDetectsChange : IDisposable
     {
         Directory.Delete(_docsDir, recursive: true);
         File.Delete(_dbPath);
+        GC.SuppressFinalize(this);
     }
 }

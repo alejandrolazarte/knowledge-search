@@ -24,5 +24,9 @@ public class When_LogServiceAppendsEvent : IDisposable
         result[0].Path.ShouldBe("docs/test.md");
     }
 
-    public void Dispose() => File.Delete(_logPath);
+    public void Dispose()
+    {
+        File.Delete(_logPath);
+        GC.SuppressFinalize(this);
+    }
 }
