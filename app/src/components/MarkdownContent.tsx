@@ -67,20 +67,35 @@ interface Props {
   children: string
   className?: string
   highlight?: string
+  docPath?: string
 }
 
-export function MarkdownContent({ children, className, highlight }: Props) {
+export function MarkdownContent({ children, className, highlight, docPath }: Props) {
   const hlWords = highlight
     ? highlight.trim().split(/\s+/).filter(w => w.length >= 2)
     : []
 
   const hl = (text: string) => hlWords.length ? applyHighlight(text, hlWords) : text
 
+  const docDir = docPath
+    ? docPath.replace(/\\/g, '/').replace(/\/[^/]+$/, '')
+    : null
+
+  function resolveImageSrc(src: string): string {
+    if (!docDir || /^(https?:\/\/|data:)/i.test(src)) return src
+    const fullPath = `${docDir}/${src}`.replace(/\//g, '\\')
+    return `/image?path=${encodeURIComponent(fullPath)}`
+  }
+
   return (
     <div className={className}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          img({ src, alt }) {
+            const resolved = src ? resolveImageSrc(src) : undefined
+            return <img src={resolved} alt={alt ?? ''} style={{ maxWidth: '100%' }} />
+          },
           code({ className: cls, children: code, ...props }) {
             const lang = extractLang(cls)
             const text = String(code)

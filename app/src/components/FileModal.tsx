@@ -91,7 +91,8 @@ export function FileModal({ path, onClose }: Props) {
                 prose-ol:text-gh-muted
                 prose-table:text-sm prose-th:text-gh-text prose-td:text-gh-muted
                 prose-blockquote:border-gh-border prose-blockquote:text-gh-muted
-                prose-hr:border-gh-border">
+                prose-hr:border-gh-border"
+                docPath={path ?? undefined}>
                 {content}
               </MarkdownContent>
           }

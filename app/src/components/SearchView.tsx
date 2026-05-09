@@ -304,7 +304,8 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
                   prose-ul:my-0.5 prose-li:my-0 prose-li:text-xs prose-li:text-gh-muted
                   prose-ol:my-0.5
                   prose-table:text-xs prose-th:text-gh-text prose-td:text-gh-muted prose-th:py-0.5 prose-td:py-0.5
-                  prose-blockquote:border-gh-border prose-blockquote:text-gh-muted prose-blockquote:text-xs">
+                  prose-blockquote:border-gh-border prose-blockquote:text-gh-muted prose-blockquote:text-xs"
+                  docPath={r.path}>
                   {r.content}
                 </MarkdownContent>
               </div>
