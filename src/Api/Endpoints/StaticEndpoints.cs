@@ -15,7 +15,10 @@ static class StaticEndpoints
         app.MapGet("/assets/{**path}", (string path) =>
         {
             var filePath = Path.Combine(staticDir, "assets", path);
-            if (!File.Exists(filePath)) return Results.NotFound();
+            if (!File.Exists(filePath))
+            {
+                return Results.NotFound();
+            }
             var mime = Path.GetExtension(filePath).ToLowerInvariant() switch
             {
                 ".js"  => "application/javascript",

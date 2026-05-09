@@ -8,7 +8,9 @@ static class AppConfig
     {
         var settingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
         if (!File.Exists(settingsPath))
+        {
             settingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+        }
 
         JsonElement? settings = File.Exists(settingsPath)
             ? JsonDocument.Parse(File.ReadAllText(settingsPath)).RootElement

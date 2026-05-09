@@ -7,7 +7,10 @@ class WatcherService(string docsDir, string dbPath, ILogService log) : Backgroun
 
     protected override Task ExecuteAsync(CancellationToken ct)
     {
-        if (!Directory.Exists(docsDir)) return Task.CompletedTask;
+        if (!Directory.Exists(docsDir))
+        {
+            return Task.CompletedTask;
+        }
 
         var watcher = new FileSystemWatcher(docsDir)
         {
@@ -17,12 +20,33 @@ class WatcherService(string docsDir, string dbPath, ILogService log) : Backgroun
             NotifyFilter         = NotifyFilters.LastWrite | NotifyFilters.FileName,
         };
 
-        watcher.Changed += (_, e) => { if (IsMd(e.FullPath)) Debounce(e.FullPath, "updated"); };
-        watcher.Created += (_, e) => { if (IsMd(e.FullPath)) Debounce(e.FullPath, "added");   };
-        watcher.Deleted += (_, e) => { if (IsMd(e.FullPath)) ProcessDelete(e.FullPath);        };
+        watcher.Changed += (_, e) =>
+        {
+            if (IsMd(e.FullPath))
+            {
+                Debounce(e.FullPath, "updated");
+            }
+        };
+        watcher.Created += (_, e) =>
+        {
+            if (IsMd(e.FullPath))
+            {
+                Debounce(e.FullPath, "added");
+            }
+        };
+        watcher.Deleted += (_, e) =>
+        {
+            if (IsMd(e.FullPath))
+            {
+                ProcessDelete(e.FullPath);
+            }
+        };
         watcher.Renamed += (_, e) =>
         {
-            if (IsMd(e.OldFullPath)) ProcessDelete(e.OldFullPath);
+            if (IsMd(e.OldFullPath))
+            {
+                ProcessDelete(e.OldFullPath);
+            }
             if (IsMd(e.FullPath))
             {
                 // Si el origen era un .md → rename real entre docs → "added" en destino
@@ -44,7 +68,10 @@ class WatcherService(string docsDir, string dbPath, ILogService log) : Backgroun
     {
         lock (_dlock)
         {
-            if (_debounce.TryGetValue(path, out var t)) t.Dispose();
+            if (_debounce.TryGetValue(path, out var t))
+            {
+                t.Dispose();
+            }
             _debounce[path] = new Timer(_ => ProcessChange(path, type), null, 500, Timeout.Infinite);
         }
     }
@@ -53,7 +80,10 @@ class WatcherService(string docsDir, string dbPath, ILogService log) : Backgroun
     {
         try
         {
-            if (!File.Exists(path)) return;
+            if (!File.Exists(path))
+            {
+                return;
+            }
 
             using var con = DbService.Open(dbPath);
             DbService.EnsureSchema(con);
@@ -66,7 +96,9 @@ class WatcherService(string docsDir, string dbPath, ILogService log) : Backgroun
             long? stored = DbService.QueryLong(con, "SELECT last_modified FROM docs_meta WHERE path=@p", path);
 
             if (stored is not null)
+            {
                 DbService.ExecP(con, "DELETE FROM docs WHERE path=@p", path);
+            }
 
             DbService.IndexFile(con, path, Path.GetFileNameWithoutExtension(path));
             DbService.ExecP2(con,

@@ -21,7 +21,10 @@ static class DbService
         Exec(con, "CREATE TABLE IF NOT EXISTS schema_info(version INTEGER NOT NULL)");
         long? version = QueryScalar(con, "SELECT version FROM schema_info LIMIT 1");
 
-        if (version == SchemaVersion) return;
+        if (version == SchemaVersion)
+        {
+            return;
+        }
 
         Exec(con, "DROP TABLE IF EXISTS docs");
         Exec(con, "DROP TABLE IF EXISTS docs_meta");
@@ -34,9 +37,13 @@ static class DbService
         Exec(con, "CREATE TABLE docs_meta(path TEXT PRIMARY KEY, last_modified INTEGER NOT NULL)");
 
         if (version is null)
+        {
             Exec(con, $"INSERT INTO schema_info(version) VALUES({SchemaVersion})");
+        }
         else
+        {
             Exec(con, $"UPDATE schema_info SET version={SchemaVersion}");
+        }
     }
 
     // ── Indexing ──────────────────────────────────────────────────────────
@@ -50,8 +57,14 @@ static class DbService
 
         void Flush()
         {
-            if (buffer.Count == 0) return;
-            if (buffer.All(l => string.IsNullOrWhiteSpace(l) || l.TrimStart().StartsWith('#'))) return;
+            if (buffer.Count == 0)
+            {
+                return;
+            }
+            if (buffer.All(l => string.IsNullOrWhiteSpace(l) || l.TrimStart().StartsWith('#')))
+            {
+                return;
+            }
 
             using var cmd = new SqliteCommand(
                 "INSERT INTO docs(title,section,content,path,line) VALUES(@t,@s,@c,@p,@l)", con);
