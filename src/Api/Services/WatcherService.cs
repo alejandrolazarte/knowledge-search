@@ -1,6 +1,6 @@
 namespace KnowledgeSearch;
 
-class WatcherService(string docsDir, string dbPath, ILogService log) : BackgroundService
+internal sealed class WatcherService(string docsDir, string dbPath, ILogService log) : BackgroundService
 {
     readonly Dictionary<string, Timer> _debounce = [];
     readonly object _dlock = new();

@@ -3,7 +3,7 @@ using System.Threading.Channels;
 
 namespace KnowledgeSearch;
 
-class LogService(string logPath) : ILogService
+internal sealed class LogService(string logPath) : ILogService
 {
     readonly object _lock = new();
     readonly List<ChannelWriter<LogEvent>> _subs = [];

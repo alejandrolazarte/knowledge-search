@@ -2,7 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace KnowledgeSearch;
 
-static class DbService
+internal static class DbService
 {
     const int SchemaVersion = 3;
 

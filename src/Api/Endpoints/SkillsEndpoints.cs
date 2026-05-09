@@ -1,6 +1,6 @@
 namespace KnowledgeSearch;
 
-static class SkillsEndpoints
+internal static class SkillsEndpoints
 {
     public static void MapSkillsRoutes(this WebApplication app, string skillsDir)
     {
@@ -60,7 +60,10 @@ static class SkillsEndpoints
                     }
                     skills.Add(new SkillSummary(name, desc, Path.GetFileName(dir)));
                 }
-                catch { /* skip broken symlinks or permission errors */ }
+                catch (Exception)
+                {
+                    // Best-effort: skip directories with broken symlinks or permission errors.
+                }
             }
             return Results.Ok(skills);
         });

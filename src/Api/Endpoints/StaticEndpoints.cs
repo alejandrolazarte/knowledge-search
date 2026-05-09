@@ -1,6 +1,6 @@
 namespace KnowledgeSearch;
 
-static class StaticEndpoints
+internal static class StaticEndpoints
 {
     public static void MapStaticRoutes(this WebApplication app, string indexHtmlPath, string staticDir)
     {

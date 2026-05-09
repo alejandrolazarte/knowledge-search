@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace KnowledgeSearch;
 
-static class EventsEndpoints
+internal static class EventsEndpoints
 {
     public static void MapEventsRoutes(this WebApplication app)
     {

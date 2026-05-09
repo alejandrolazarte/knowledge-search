@@ -2,10 +2,10 @@ using System.Text.Json.Serialization;
 
 namespace KnowledgeSearch;
 
-record SearchResult(string Title, string Section, string Path, int Line, string Content);
-record IndexResult(int Added, int Updated, int Deleted);
-record HealthResult(string Status);
-record SkillSummary(string Name, string Description, string DirName);
+internal record SearchResult(string Title, string Section, string Path, int Line, string Content);
+internal record IndexResult(int Added, int Updated, int Deleted);
+internal record HealthResult(string Status);
+internal record SkillSummary(string Name, string Description, string DirName);
 public record LogEvent(
     [property: JsonPropertyName("ts")]   string Ts,
     [property: JsonPropertyName("type")] string Type,

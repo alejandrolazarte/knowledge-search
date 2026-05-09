@@ -2,7 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace KnowledgeSearch;
 
-static class SearchEndpoints
+internal static class SearchEndpoints
 {
     public static void MapSearchRoutes(this WebApplication app, string dbPath, string docsDir)
     {
