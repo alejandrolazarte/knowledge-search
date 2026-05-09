@@ -5,4 +5,10 @@
   <Folder Name="/test/">
     <Project Path="test/Api.Tests/Api.Tests.csproj" />
   </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="NuGet.config" />
+    <File Path=".gitignore" />
+  </Folder>
 </Solution>
