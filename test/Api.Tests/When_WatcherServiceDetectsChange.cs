@@ -8,14 +8,12 @@ namespace Api.Tests;
 public class When_WatcherServiceDetectsChange : IDisposable
 {
     readonly string _docsDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-    readonly string _dbPath  = Path.GetTempFileName();
+    readonly Mock<IDbService>  _mockDb  = new();
     readonly Mock<ILogService> _mockLog = new();
 
     public When_WatcherServiceDetectsChange()
     {
         Directory.CreateDirectory(_docsDir);
-        using var con = DbService.Open(_dbPath);
-        DbService.EnsureSchema(con);
     }
 
     [Fact]
@@ -24,7 +22,7 @@ public class When_WatcherServiceDetectsChange : IDisposable
         var filePath = Path.Combine(_docsDir, "guide.md");
         File.WriteAllText(filePath, "# Title\nSome content");
 
-        var sut = new WatcherService(_docsDir, _dbPath, _mockLog.Object);
+        var sut = new WatcherService([_docsDir], _mockDb.Object, _mockLog.Object);
         sut.ProcessChange(filePath, "added");
 
         _mockLog.Verify(
@@ -37,7 +35,6 @@ public class When_WatcherServiceDetectsChange : IDisposable
     public void Dispose()
     {
         Directory.Delete(_docsDir, recursive: true);
-        File.Delete(_dbPath);
         GC.SuppressFinalize(this);
     }
 }

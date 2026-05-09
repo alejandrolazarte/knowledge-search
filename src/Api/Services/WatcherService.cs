@@ -1,18 +1,35 @@
 namespace KnowledgeSearch;
 
-internal sealed class WatcherService(string docsDir, string dbPath, ILogService log) : BackgroundService
+internal sealed class WatcherService(
+    IReadOnlyList<string> roots,
+    IDbService dbService,
+    ILogService log) : BackgroundService
 {
     private readonly Dictionary<string, Timer> _debounce = [];
     private readonly object _debounceLock = new();
 
     protected override Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        if (!Directory.Exists(docsDir))
+        foreach (var root in roots.Where(Directory.Exists))
         {
-            return Task.CompletedTask;
+            try
+            {
+                var watcher = CreateWatcher(root);
+                cancellationToken.Register(() => watcher.Dispose());
+            }
+            catch (Exception ex)
+            {
+                log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), "error",
+                    $"Failed to start watcher for {root}: {ex.Message}"));
+            }
         }
 
-        var watcher = new FileSystemWatcher(docsDir)
+        return Task.Delay(Timeout.Infinite, cancellationToken);
+    }
+
+    private FileSystemWatcher CreateWatcher(string root)
+    {
+        var watcher = new FileSystemWatcher(root)
         {
             Filter                = "*",
             IncludeSubdirectories = true,
@@ -39,8 +56,7 @@ internal sealed class WatcherService(string docsDir, string dbPath, ILogService 
             }
         };
 
-        cancellationToken.Register(() => watcher.Dispose());
-        return Task.Delay(Timeout.Infinite, cancellationToken);
+        return watcher;
     }
 
     private static bool IsMd(string path) =>
@@ -64,36 +80,13 @@ internal sealed class WatcherService(string docsDir, string dbPath, ILogService 
     {
         try
         {
-            if (!File.Exists(path))
-            {
-                return;
-            }
-
-            using var connection = DbService.Open(dbPath);
-            DbService.EnsureSchema(connection);
-
-            // Mtime check is intentionally skipped here — the watcher already guarantees
-            // a change occurred. Checking mtime would cause false negatives for atomic writes
-            // (write-to-temp + rename) which preserve the original file's LastWriteTime.
-            var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds();
-            var stored     = DbService.QueryFirstLong(connection, "SELECT last_modified FROM docs_meta WHERE path=@path", path);
-
-            if (stored is not null)
-            {
-                DbService.Execute(connection, "DELETE FROM docs WHERE path=@path", path);
-            }
-
-            DbService.IndexFile(connection, path, Path.GetFileNameWithoutExtension(path));
-            DbService.Execute(connection,
-                "INSERT INTO docs_meta(path,last_modified) VALUES(@path,@modifiedAt) ON CONFLICT(path) DO UPDATE SET last_modified=excluded.last_modified",
-                path, modifiedAt);
-
-            var relativePath = Path.GetRelativePath(docsDir, path).Replace('\\', '/');
+            dbService.ReindexFile(path);
+            var relativePath = GetRelativePath(path);
             log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), eventType, relativePath));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Best-effort: watcher operations must not crash the host.
+            log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), "error", ex.Message));
         }
     }
 
@@ -101,16 +94,26 @@ internal sealed class WatcherService(string docsDir, string dbPath, ILogService 
     {
         try
         {
-            using var connection = DbService.Open(dbPath);
-            DbService.Execute(connection, "DELETE FROM docs      WHERE path=@path", path);
-            DbService.Execute(connection, "DELETE FROM docs_meta WHERE path=@path", path);
-
-            var relativePath = Path.GetRelativePath(docsDir, path).Replace('\\', '/');
+            dbService.DeleteFile(path);
+            var relativePath = GetRelativePath(path);
             log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), "deleted", relativePath));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Best-effort: watcher operations must not crash the host.
+            log.Append(new LogEvent(DateTime.UtcNow.ToString("o"), "error", ex.Message));
         }
+    }
+
+    private string GetRelativePath(string path)
+    {
+        foreach (var root in roots)
+        {
+            if (path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.GetRelativePath(root, path).Replace('\\', '/');
+            }
+        }
+
+        return path.Replace('\\', '/');
     }
 }
