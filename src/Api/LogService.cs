@@ -8,6 +8,14 @@ class LogService(string logPath) : ILogService
     readonly object _lock = new();
     readonly List<ChannelWriter<LogEvent>> _subs = [];
 
+    // Case-insensitive options for reading old log entries that may have
+    // been written with a different casing (e.g. PascalCase before the fix).
+    static readonly JsonSerializerOptions _readOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        TypeInfoResolverChain        = { AppJsonContext.Default },
+    };
+
     public void Append(LogEvent ev)
     {
         var line = JsonSerializer.Serialize(ev, AppJsonContext.Default.LogEvent);
@@ -25,7 +33,7 @@ class LogService(string logPath) : ILogService
         {
             try
             {
-                var ev = JsonSerializer.Deserialize(line, AppJsonContext.Default.LogEvent);
+                var ev = JsonSerializer.Deserialize<LogEvent>(line, _readOpts);
                 if (ev is not null) result.Add(ev);
             }
             catch { }
