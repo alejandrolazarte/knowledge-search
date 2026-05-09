@@ -2,10 +2,22 @@ using System.Text.Json.Serialization;
 
 namespace KnowledgeSearch;
 
-internal record SearchResult(string Title, string Section, string Path, int Line, string Content);
+internal record SearchResult(string Title, string Section, string Path, int Line, string Content, string Root);
 internal record IndexResult(int Added, int Updated, int Deleted);
 internal record HealthResult(string Status);
+internal record ErrorResult(string Error);
 internal record SkillSummary(string Name, string Description, string DirName);
+
+[Flags]
+internal enum SearchMode
+{
+    None    = 0,
+    Phrase  = 1,
+    And     = 2,
+    Or      = 4,
+    Default = Phrase | And | Or,
+}
+
 public record LogEvent(
     [property: JsonPropertyName("ts")]   string Ts,
     [property: JsonPropertyName("type")] string Type,
@@ -14,8 +26,10 @@ public record LogEvent(
 [JsonSerializable(typeof(List<SearchResult>))]
 [JsonSerializable(typeof(List<SkillSummary>))]
 [JsonSerializable(typeof(List<LogEvent>))]
+[JsonSerializable(typeof(List<string>))]
 [JsonSerializable(typeof(LogEvent))]
 [JsonSerializable(typeof(IndexResult))]
 [JsonSerializable(typeof(HealthResult))]
+[JsonSerializable(typeof(ErrorResult))]
 [JsonSerializable(typeof(string))]
 internal partial class AppJsonContext : JsonSerializerContext { }
