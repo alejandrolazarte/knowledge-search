@@ -202,9 +202,71 @@ builder.Services.AddSingleton<IDbService>(dbService);
 
 ---
 
+## Parámetros opcionales de búsqueda
+
+### `modes` — estrategias FTS
+
+El endpoint acepta un parámetro `modes` que controla qué estrategias FTS5 se combinan. Por defecto las tres en cascade (phrase → AND → OR).
+
+```
+GET /search?q=high+cohesion&limit=5                   → cascade completo (default)
+GET /search?q=high+cohesion&limit=5&modes=phrase       → solo frase exacta
+GET /search?q=high+cohesion&limit=5&modes=phrase,and   → frase + AND, sin OR
+GET /search?q=deploy&limit=10&modes=or                 → OR suelto (comportamiento anterior)
+```
+
+**`SearchMode`** — flags enum en el backend:
+
+```csharp
+[Flags]
+internal enum SearchMode
+{
+    Phrase  = 1,
+    And     = 2,
+    Or      = 4,
+    Default = Phrase | And | Or
+}
+```
+
+`BuildFtsQuery(string query, SearchMode modes)` construye la query FTS5 según las flags activas. Si `modes` no se envía en el request, se usa `SearchMode.Default`.
+
+### `roots` — filtrado por root
+
+Filtra resultados a uno o más roots por nombre (último segmento del path). Si no se envía, busca en todos los roots.
+
+```
+GET /search?q=deploy&roots=Documentation              → solo en ese root
+GET /search?q=deploy&roots=repos,work                 → en dos roots
+```
+
+**`IDbService.Search`** actualizado:
+
+```csharp
+/// <summary>
+/// Busca documentos usando cascade phrase → AND → OR según <paramref name="modes"/>.
+/// Si <paramref name="roots"/> está vacío busca en todos los roots configurados.
+/// Retorna hasta <paramref name="limit"/> resultados ordenados por BM25.
+/// </summary>
+IReadOnlyList<SearchResult> Search(
+    string query,
+    int limit,
+    SearchMode modes = SearchMode.Default,
+    IReadOnlyList<string>? roots = null);
+```
+
+El filtrado por root se aplica post-query en memoria (los roots son pocos, no vale la pena SQL extra).
+
+### Frontend — controles de búsqueda
+
+- **Chips de modo** (`Phrase` / `AND` / `OR`) — toggleables, multiselectables. Solo visibles si el usuario los despliega (no ocupan espacio por default). Estado persistido en `localStorage`.
+- **Selector de roots** — multiselect desplegable. Solo se muestra si hay más de un root configurado (nuevo endpoint `GET /roots` que los lista).
+- La URL del dev server refleja los parámetros: fácil de copiar y compartir con Claude Code.
+
+---
+
 ## Frontend — campo `Root` en resultados
 
-`SearchResult` ahora incluye `root`. El frontend muestra el nombre del root debajo del título del resultado, similar al path actual. Cambios en `types.ts` y `SearchView.tsx`.
+`SearchResult` ahora incluye `root`. El frontend muestra el nombre del root como badge junto al path del resultado. Cambios en `types.ts` y `SearchView.tsx`.
 
 ---
 
@@ -231,11 +293,12 @@ Crea una DB en temp, indexa un archivo markdown de prueba, verifica:
 | `src/Api/Persistence/IDbService.cs` | Crear |
 | `src/Api/Persistence/DbService.cs` | Refactorizar (instancia, SQL const, transacciones) |
 | `src/Api/Services/WatcherService.cs` | Múltiples roots |
-| `src/Api/Endpoints/SearchEndpoints.cs` | Usar `IDbService`, `IsPathAllowed` |
+| `src/Api/Endpoints/SearchEndpoints.cs` | Usar `IDbService`, `IsPathAllowed`, params `modes`/`roots` |
 | `src/Api/Models/SearchResult.cs` | Agregar campo `Root` |
+| `src/Api/Models/SearchMode.cs` | Crear (flags enum) |
 | `src/Api/Models/ErrorResult.cs` | Crear |
 | `src/Api/Program.cs` | `IConfiguration`, DI, middleware |
 | `app/src/types.ts` | Agregar `root` a `SearchResult` |
-| `app/src/components/SearchView.tsx` | Mostrar `root` en resultados |
+| `app/src/components/SearchView.tsx` | Mostrar `root`, chips de modo, selector de roots |
 | `test/Api.Tests/When_DbServiceSearches.cs` | Crear |
 | `test/Api.Tests/When_WatcherServiceDetectsChange.cs` | Ajustar constructor |
