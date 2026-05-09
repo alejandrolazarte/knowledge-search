@@ -162,10 +162,12 @@ Method renames:
 
 | Before | After |
 |--------|-------|
-| `ExecP(con, sql, path)` | `Execute(con, sql, path)` |
-| `ExecP2(con, sql, path, mtime)` | `Execute(con, sql, path, mtime)` (overload) |
-| `QueryLong(con, sql, path)` | `QueryFirstLong(con, sql, path)` |
-| `QueryScalar(con, sql, q, limit)` | `Search(con, query, limit)` |
+| `ExecP(con, sql, path)` | `Execute(connection, sql, path)` |
+| `ExecP2(con, sql, path, mtime)` | `Execute(connection, sql, path, mtime)` (overload) |
+| `QueryLong(con, sql, path)` | `QueryFirstLong(connection, sql, path)` |
+| `QueryScalar(con, sql, q, limit)` | `Search(connection, query, limit)` |
+
+`con` → `connection` in all method signatures and call sites across `DbService`, `SearchEndpoints`, `WatcherService`.
 
 SQL parameter names (inside each method body):
 
