@@ -31,10 +31,10 @@ internal sealed class WatcherService(
     {
         var watcher = new FileSystemWatcher(root)
         {
-            Filter                = "*",
+            Filter = "*",
             IncludeSubdirectories = true,
-            EnableRaisingEvents   = true,
-            NotifyFilter          = NotifyFilters.LastWrite | NotifyFilters.FileName,
+            EnableRaisingEvents = true,
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
         };
 
         watcher.Changed += (_, e) => { if (IsMd(e.FullPath)) { Debounce(e.FullPath, "updated"); } };
@@ -60,7 +60,7 @@ internal sealed class WatcherService(
     }
 
     private static bool IsMd(string path) =>
-        path.EndsWith(".md",  StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(".mkd", StringComparison.OrdinalIgnoreCase);
 
     private void Debounce(string path, string eventType)

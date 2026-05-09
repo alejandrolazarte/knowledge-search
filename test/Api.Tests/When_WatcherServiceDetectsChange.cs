@@ -8,7 +8,7 @@ namespace Api.Tests;
 public class When_WatcherServiceDetectsChange : IDisposable
 {
     readonly string _docsDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-    readonly Mock<IDbService>  _mockDb  = new();
+    readonly Mock<IDbService> _mockDb = new();
     readonly Mock<ILogService> _mockLog = new();
 
     public When_WatcherServiceDetectsChange()

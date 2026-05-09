@@ -8,18 +8,8 @@ internal record HealthResult(string Status);
 internal record ErrorResult(string Error);
 internal record SkillSummary(string Name, string Description, string DirName);
 
-[Flags]
-internal enum SearchMode
-{
-    None    = 0,
-    Phrase  = 1,
-    And     = 2,
-    Or      = 4,
-    Default = Phrase | And | Or,
-}
-
 public record LogEvent(
-    [property: JsonPropertyName("ts")]   string Ts,
+    [property: JsonPropertyName("ts")] string Ts,
     [property: JsonPropertyName("type")] string Type,
     [property: JsonPropertyName("path")] string Path);
 

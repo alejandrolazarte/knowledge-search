@@ -7,7 +7,7 @@ namespace Api.Tests;
 public class When_DbServiceSearches : IDisposable
 {
     private readonly string _docsDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-    private readonly string _dbPath  = Path.GetTempFileName();
+    private readonly string _dbPath = Path.GetTempFileName();
     private readonly DbService _sut;
 
     public When_DbServiceSearches()

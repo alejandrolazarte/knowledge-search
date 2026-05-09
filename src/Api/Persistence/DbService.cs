@@ -4,21 +4,21 @@ namespace KnowledgeSearch;
 
 internal sealed class DbService : IDbService, IDisposable
 {
-    private const int SchemaVersion = 3;
+    private const int _schemaVersion = 3;
 
-    private const string InsertSql =
+    private const string _insertSql =
         "INSERT INTO docs(title,section,content,path,line) " +
         "VALUES(@title,@section,@content,@path,@line)";
 
-    private const string SearchSql =
+    private const string _searchSql =
         "SELECT title,section,path,line,content " +
         "FROM docs WHERE docs MATCH @query " +
         "ORDER BY bm25(docs,10,5,1) LIMIT @limit";
 
-    private const string GetStoredModifiedAtSql =
+    private const string _getStoredModifiedAtSql =
         "SELECT last_modified FROM docs_meta WHERE path=@path";
 
-    private const string UpsertMetaSql =
+    private const string _upsertMetaSql =
         "INSERT INTO docs_meta(path,last_modified) VALUES(@path,@modifiedAt) " +
         "ON CONFLICT(path) DO UPDATE SET last_modified=excluded.last_modified";
 
@@ -49,7 +49,7 @@ internal sealed class DbService : IDbService, IDisposable
             var ftsQuery = BuildFtsQuery(query, modes);
             var rawResults = new List<SearchResult>();
 
-            using var command = new SqliteCommand(SearchSql, _connection);
+            using var command = new SqliteCommand(_searchSql, _connection);
             command.Parameters.AddWithValue("@query", ftsQuery);
             command.Parameters.AddWithValue("@limit", limit);
 
@@ -90,7 +90,7 @@ internal sealed class DbService : IDbService, IDisposable
                 {
                     try
                     {
-                        return Directory.EnumerateFiles(root, "*.md",  SearchOption.AllDirectories)
+                        return Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
                             .Concat(Directory.EnumerateFiles(root, "*.mkd", SearchOption.AllDirectories));
                     }
                     catch (DirectoryNotFoundException)
@@ -149,7 +149,7 @@ internal sealed class DbService : IDbService, IDisposable
             {
                 var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeSeconds();
                 long? stored;
-                using (var command = new SqliteCommand(GetStoredModifiedAtSql, _connection))
+                using (var command = new SqliteCommand(_getStoredModifiedAtSql, _connection))
                 {
                     command.Parameters.AddWithValue("@path", file);
                     var result = command.ExecuteScalar();
@@ -172,7 +172,7 @@ internal sealed class DbService : IDbService, IDisposable
 
                     IndexFileSections(file, Path.GetFileNameWithoutExtension(file), transaction);
 
-                    using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
+                    using (var metaCmd = new SqliteCommand(_upsertMetaSql, _connection, transaction))
                     {
                         metaCmd.Parameters.AddWithValue("@path", file);
                         metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
@@ -237,7 +237,7 @@ internal sealed class DbService : IDbService, IDisposable
 
                 IndexFileSections(path, Path.GetFileNameWithoutExtension(path), transaction);
 
-                using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
+                using (var metaCmd = new SqliteCommand(_upsertMetaSql, _connection, transaction))
                 {
                     metaCmd.Parameters.AddWithValue("@path", path);
                     metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
@@ -372,12 +372,12 @@ internal sealed class DbService : IDbService, IDisposable
                 return;
             }
 
-            using var command = new SqliteCommand(InsertSql, _connection, transaction);
-            command.Parameters.AddWithValue("@title",   title);
+            using var command = new SqliteCommand(_insertSql, _connection, transaction);
+            command.Parameters.AddWithValue("@title", title);
             command.Parameters.AddWithValue("@section", section);
             command.Parameters.AddWithValue("@content", string.Join("\n", buffer).Trim());
-            command.Parameters.AddWithValue("@path",    path);
-            command.Parameters.AddWithValue("@line",    startLine);
+            command.Parameters.AddWithValue("@path", path);
+            command.Parameters.AddWithValue("@line", startLine);
             command.ExecuteNonQuery();
             buffer.Clear();
         }
@@ -388,7 +388,7 @@ internal sealed class DbService : IDbService, IDisposable
             {
                 Flush();
                 startLine = i + 1;
-                section   = lines[i].TrimStart('#').Trim();
+                section = lines[i].TrimStart('#').Trim();
             }
 
             buffer.Add(lines[i]);
@@ -409,7 +409,7 @@ internal sealed class DbService : IDbService, IDisposable
         ExecuteSql("CREATE TABLE IF NOT EXISTS schema_info(version INTEGER NOT NULL)");
         var version = QuerySchemaVersion();
 
-        if (version == SchemaVersion)
+        if (version == _schemaVersion)
         {
             return;
         }
@@ -426,11 +426,11 @@ internal sealed class DbService : IDbService, IDisposable
 
         if (version is null)
         {
-            ExecuteSql($"INSERT INTO schema_info(version) VALUES({SchemaVersion})");
+            ExecuteSql($"INSERT INTO schema_info(version) VALUES({_schemaVersion})");
         }
         else
         {
-            ExecuteSql($"UPDATE schema_info SET version={SchemaVersion}");
+            ExecuteSql($"UPDATE schema_info SET version={_schemaVersion}");
         }
     }
 

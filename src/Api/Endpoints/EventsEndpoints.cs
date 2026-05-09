@@ -11,8 +11,8 @@ internal static class EventsEndpoints
 
         app.MapGet("/events", async (ILogService log, HttpContext ctx, CancellationToken ct) =>
         {
-            ctx.Response.Headers.Append("Content-Type",      "text/event-stream");
-            ctx.Response.Headers.Append("Cache-Control",     "no-cache");
+            ctx.Response.Headers.Append("Content-Type", "text/event-stream");
+            ctx.Response.Headers.Append("Cache-Control", "no-cache");
             ctx.Response.Headers.Append("X-Accel-Buffering", "no");
 
             var ch = log.Subscribe();
