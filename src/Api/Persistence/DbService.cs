@@ -297,6 +297,7 @@ internal sealed class DbService : IDbService, IDisposable
     public void Dispose()
     {
         _connection.Dispose();
+        SqliteConnection.ClearAllPools();
         GC.SuppressFinalize(this);
     }
 
