@@ -31,3 +31,7 @@ Thumbs.db
 .api.log
 .api.err
 knowledge.log
+
+# Tooling artifacts (no versionar)
+.superpowers/
+src/.claude/
