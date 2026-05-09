@@ -24,6 +24,7 @@ internal sealed class DbService : IDbService, IDisposable
 
     private readonly SqliteConnection _connection;
     private readonly IReadOnlyList<string> _roots;
+    private readonly object _connectionLock = new();
 
     public DbService(string dbPath, IReadOnlyList<string> roots)
     {
@@ -43,193 +44,261 @@ internal sealed class DbService : IDbService, IDisposable
         SearchMode modes = SearchMode.Default,
         IReadOnlyList<string>? roots = null)
     {
-        var ftsQuery = BuildFtsQuery(query, modes);
-        var rawResults = new List<SearchResult>();
-
-        using var command = new SqliteCommand(SearchSql, _connection);
-        command.Parameters.AddWithValue("@query", ftsQuery);
-        command.Parameters.AddWithValue("@limit", limit);
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        lock (_connectionLock)
         {
-            var path = reader.GetString(2);
-            rawResults.Add(new SearchResult(
-                reader.GetString(0),
-                reader.GetString(1),
-                path,
-                reader.GetInt32(3),
-                reader.GetString(4),
-                GetRoot(path)));
-        }
+            var ftsQuery = BuildFtsQuery(query, modes);
+            var rawResults = new List<SearchResult>();
 
-        if (roots is null || roots.Count == 0)
-        {
-            return rawResults;
-        }
+            using var command = new SqliteCommand(SearchSql, _connection);
+            command.Parameters.AddWithValue("@query", ftsQuery);
+            command.Parameters.AddWithValue("@limit", limit);
 
-        return rawResults
-            .Where(result => roots.Contains(result.Root, StringComparer.OrdinalIgnoreCase))
-            .ToList();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var path = reader.GetString(2);
+                rawResults.Add(new SearchResult(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    path,
+                    reader.GetInt32(3),
+                    reader.GetString(4),
+                    GetRoot(path)));
+            }
+
+            if (roots is null || roots.Count == 0)
+            {
+                return rawResults;
+            }
+
+            return rawResults
+                .Where(result => roots.Contains(result.Root, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+        }
     }
 
     /// <inheritdoc/>
     public IndexResult IndexDirectories()
     {
-        var separator = Path.DirectorySeparatorChar;
-
-        var files = _roots
-            .Where(Directory.Exists)
-            .SelectMany(root =>
-                Directory.EnumerateFiles(root, "*.md",  SearchOption.AllDirectories)
-                .Concat(Directory.EnumerateFiles(root, "*.mkd", SearchOption.AllDirectories)))
-            .Select(Path.GetFullPath)
-            .Where(filePath =>
-                !filePath.Contains($"{separator}node_modules{separator}") &&
-                !filePath.Contains($"{separator}.git{separator}"))
-            .ToHashSet();
-
-        var indexed = new HashSet<string>();
-        using (var command = new SqliteCommand("SELECT path FROM docs_meta", _connection))
-        using (var reader = command.ExecuteReader())
+        lock (_connectionLock)
         {
-            while (reader.Read())
-            {
-                indexed.Add(reader.GetString(0));
-            }
-        }
+            var separator = Path.DirectorySeparatorChar;
 
-        int deleted = 0, added = 0, updated = 0;
-
-        var toDelete = indexed.Except(files).ToList();
-        if (toDelete.Count > 0)
-        {
-            using var deleteTransaction = _connection.BeginTransaction();
-            foreach (var removed in toDelete)
-            {
-                using (var docsCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, deleteTransaction))
+            var files = _roots
+                .Where(Directory.Exists)
+                .SelectMany(root =>
                 {
-                    docsCmd.Parameters.AddWithValue("@path", removed);
-                    docsCmd.ExecuteNonQuery();
-                }
-                using (var metaCmd = new SqliteCommand("DELETE FROM docs_meta WHERE path=@path", _connection, deleteTransaction))
+                    try
+                    {
+                        return Directory.EnumerateFiles(root, "*.md",  SearchOption.AllDirectories)
+                            .Concat(Directory.EnumerateFiles(root, "*.mkd", SearchOption.AllDirectories));
+                    }
+                    catch (DirectoryNotFoundException)
+                    {
+                        return Enumerable.Empty<string>();
+                    }
+                })
+                .Select(Path.GetFullPath)
+                .Where(filePath =>
+                    !filePath.Contains($"{separator}node_modules{separator}") &&
+                    !filePath.Contains($"{separator}.git{separator}"))
+                .ToHashSet();
+
+            var indexed = new HashSet<string>();
+            using (var command = new SqliteCommand("SELECT path FROM docs_meta", _connection))
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
                 {
-                    metaCmd.Parameters.AddWithValue("@path", removed);
-                    metaCmd.ExecuteNonQuery();
+                    indexed.Add(reader.GetString(0));
                 }
-                deleted++;
             }
-            deleteTransaction.Commit();
+
+            int deleted = 0, added = 0, updated = 0;
+
+            var toDelete = indexed.Except(files).ToList();
+            if (toDelete.Count > 0)
+            {
+                using var deleteTransaction = _connection.BeginTransaction();
+                try
+                {
+                    foreach (var removed in toDelete)
+                    {
+                        using (var docsCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, deleteTransaction))
+                        {
+                            docsCmd.Parameters.AddWithValue("@path", removed);
+                            docsCmd.ExecuteNonQuery();
+                        }
+                        using (var metaCmd = new SqliteCommand("DELETE FROM docs_meta WHERE path=@path", _connection, deleteTransaction))
+                        {
+                            metaCmd.Parameters.AddWithValue("@path", removed);
+                            metaCmd.ExecuteNonQuery();
+                        }
+                        deleted++;
+                    }
+                    deleteTransaction.Commit();
+                }
+                catch
+                {
+                    deleteTransaction.Rollback();
+                    throw;
+                }
+            }
+
+            foreach (var file in files)
+            {
+                var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeSeconds();
+                long? stored;
+                using (var command = new SqliteCommand(GetStoredModifiedAtSql, _connection))
+                {
+                    command.Parameters.AddWithValue("@path", file);
+                    var result = command.ExecuteScalar();
+                    stored = result is null or DBNull ? null : Convert.ToInt64(result);
+                }
+
+                if (stored == modifiedAt)
+                {
+                    continue;
+                }
+
+                using var transaction = _connection.BeginTransaction();
+                try
+                {
+                    using (var deleteCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
+                    {
+                        deleteCmd.Parameters.AddWithValue("@path", file);
+                        deleteCmd.ExecuteNonQuery();
+                    }
+
+                    IndexFileSections(file, Path.GetFileNameWithoutExtension(file), transaction);
+
+                    using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
+                    {
+                        metaCmd.Parameters.AddWithValue("@path", file);
+                        metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
+                        metaCmd.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+
+                if (stored is null)
+                {
+                    added++;
+                }
+                else
+                {
+                    updated++;
+                }
+            }
+
+            return new IndexResult(added, updated, deleted);
         }
-
-        foreach (var file in files)
-        {
-            var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeSeconds();
-            long? stored;
-            using (var command = new SqliteCommand(GetStoredModifiedAtSql, _connection))
-            {
-                command.Parameters.AddWithValue("@path", file);
-                var result = command.ExecuteScalar();
-                stored = result is null or DBNull ? null : Convert.ToInt64(result);
-            }
-
-            if (stored == modifiedAt)
-            {
-                continue;
-            }
-
-            using var transaction = _connection.BeginTransaction();
-            using (var deleteCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
-            {
-                deleteCmd.Parameters.AddWithValue("@path", file);
-                deleteCmd.ExecuteNonQuery();
-            }
-
-            IndexFileSections(file, Path.GetFileNameWithoutExtension(file), transaction);
-
-            using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
-            {
-                metaCmd.Parameters.AddWithValue("@path", file);
-                metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
-                metaCmd.ExecuteNonQuery();
-            }
-
-            transaction.Commit();
-
-            if (stored is null)
-            {
-                added++;
-            }
-            else
-            {
-                updated++;
-            }
-        }
-
-        return new IndexResult(added, updated, deleted);
     }
 
     /// <inheritdoc/>
-    public bool IsPathAllowed(string fullPath) =>
-        _roots.Any(root =>
-            fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase));
+    public bool IsPathAllowed(string fullPath)
+    {
+        lock (_connectionLock)
+        {
+            return _roots.Any(root =>
+                fullPath.StartsWith(
+                    root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                        + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+    }
 
     /// <inheritdoc/>
     public void ReindexFile(string path)
     {
-        if (!File.Exists(path))
+        lock (_connectionLock)
         {
-            return;
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds();
+
+            using var transaction = _connection.BeginTransaction();
+            try
+            {
+                using (var deleteCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
+                {
+                    deleteCmd.Parameters.AddWithValue("@path", path);
+                    deleteCmd.ExecuteNonQuery();
+                }
+
+                IndexFileSections(path, Path.GetFileNameWithoutExtension(path), transaction);
+
+                using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
+                {
+                    metaCmd.Parameters.AddWithValue("@path", path);
+                    metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
+                    metaCmd.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
-
-        var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds();
-
-        using var transaction = _connection.BeginTransaction();
-
-        using (var deleteCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
-        {
-            deleteCmd.Parameters.AddWithValue("@path", path);
-            deleteCmd.ExecuteNonQuery();
-        }
-
-        IndexFileSections(path, Path.GetFileNameWithoutExtension(path), transaction);
-
-        using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
-        {
-            metaCmd.Parameters.AddWithValue("@path", path);
-            metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
-            metaCmd.ExecuteNonQuery();
-        }
-
-        transaction.Commit();
     }
 
     /// <inheritdoc/>
     public void DeleteFile(string path)
     {
-        using var transaction = _connection.BeginTransaction();
-
-        using (var docsCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
+        lock (_connectionLock)
         {
-            docsCmd.Parameters.AddWithValue("@path", path);
-            docsCmd.ExecuteNonQuery();
-        }
+            using var transaction = _connection.BeginTransaction();
+            try
+            {
+                using (var docsCmd = new SqliteCommand("DELETE FROM docs WHERE path=@path", _connection, transaction))
+                {
+                    docsCmd.Parameters.AddWithValue("@path", path);
+                    docsCmd.ExecuteNonQuery();
+                }
 
-        using (var metaCmd = new SqliteCommand("DELETE FROM docs_meta WHERE path=@path", _connection, transaction))
-        {
-            metaCmd.Parameters.AddWithValue("@path", path);
-            metaCmd.ExecuteNonQuery();
-        }
+                using (var metaCmd = new SqliteCommand("DELETE FROM docs_meta WHERE path=@path", _connection, transaction))
+                {
+                    metaCmd.Parameters.AddWithValue("@path", path);
+                    metaCmd.ExecuteNonQuery();
+                }
 
-        transaction.Commit();
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<string> GetRootNames() =>
-        _roots.Select(root => Path.GetFileName(root)!).ToList();
+    public IReadOnlyList<string> GetRootNames()
+    {
+        lock (_connectionLock)
+        {
+            return _roots.Select(root => Path.GetFileName(root)!).ToList();
+        }
+    }
 
     /// <inheritdoc/>
-    public void Dispose() => _connection.Dispose();
+    public void Dispose()
+    {
+        _connection.Dispose();
+        GC.SuppressFinalize(this);
+    }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -272,9 +341,11 @@ internal sealed class DbService : IDbService, IDisposable
     {
         foreach (var root in _roots)
         {
-            if (path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            var normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            if (path.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
             {
-                return Path.GetFileName(root)!;
+                return Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))!;
             }
         }
 
