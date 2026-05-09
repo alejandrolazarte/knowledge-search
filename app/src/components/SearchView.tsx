@@ -1,11 +1,13 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { MarkdownContent } from './MarkdownContent'
 import { FileModal } from './FileModal'
 import type { SearchResult } from '../types'
 
 // ── History ───────────────────────────────────────────────────────────────────
-const HISTORY_KEY = 'ks-search-history'
-const MAX_HISTORY = 8
+const HISTORY_KEY     = 'ks-search-history'
+const MODES_KEY       = 'ks-search-modes'
+const ROOTS_KEY       = 'ks-search-roots'
+const MAX_HISTORY     = 8
 
 function loadHistory(): string[] {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]') } catch { return [] }
@@ -14,6 +16,25 @@ function pushHistory(q: string, prev: string[]): string[] {
   const next = [q, ...prev.filter(h => h !== q)].slice(0, MAX_HISTORY)
   localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
   return next
+}
+
+// ── Search modes ──────────────────────────────────────────────────────────────
+type ModeName = 'phrase' | 'and' | 'or'
+interface ActiveModes { phrase: boolean; and: boolean; or: boolean }
+
+const DEFAULT_MODES: ActiveModes = { phrase: true, and: true, or: true }
+
+function loadModes(): ActiveModes {
+  try { return { ...DEFAULT_MODES, ...JSON.parse(localStorage.getItem(MODES_KEY) ?? '{}') } }
+  catch { return DEFAULT_MODES }
+}
+function saveModes(modes: ActiveModes) {
+  localStorage.setItem(MODES_KEY, JSON.stringify(modes))
+}
+
+function modesParam(modes: ActiveModes): string {
+  const active = (['phrase', 'and', 'or'] as ModeName[]).filter(m => modes[m])
+  return active.length === 3 ? '' : active.join(',')  // empty = default (all), no need to send
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -28,31 +49,69 @@ interface Props {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props) {
-  const localRef                          = useRef<HTMLInputElement>(null)
-  const inputRef                          = externalRef ?? localRef
-  const [query,         setQuery]         = useState('')
-  const [searchedQuery, setSearchedQuery] = useState('')
-  const [results,       setResults]       = useState<SearchResult[]>([])
-  const [loading,       setLoading]       = useState(false)
-  const [expanded,      setExpanded]      = useState<Set<number>>(new Set())
-  const [history,       setHistory]       = useState<string[]>(loadHistory)
-  const [showHistory,   setShowHistory]   = useState(false)
-  const [limit,         setLimit]         = useState<Limit>(10)
-  const [copiedIdx,     setCopiedIdx]     = useState<number | null>(null)
-  const [openFile,      setOpenFile]      = useState<string | null>(null)
+  const localRef                              = useRef<HTMLInputElement>(null)
+  const inputRef                              = externalRef ?? localRef
+  const [query,           setQuery]           = useState('')
+  const [searchedQuery,   setSearchedQuery]   = useState('')
+  const [results,         setResults]         = useState<SearchResult[]>([])
+  const [loading,         setLoading]         = useState(false)
+  const [expanded,        setExpanded]        = useState<Set<number>>(new Set())
+  const [history,         setHistory]         = useState<string[]>(loadHistory)
+  const [showHistory,     setShowHistory]     = useState(false)
+  const [limit,           setLimit]           = useState<Limit>(10)
+  const [copiedIdx,       setCopiedIdx]       = useState<number | null>(null)
+  const [openFile,        setOpenFile]        = useState<string | null>(null)
+  const [showModes,       setShowModes]       = useState(false)
+  const [activeModes,     setActiveModes]     = useState<ActiveModes>(loadModes)
+  const [availableRoots,  setAvailableRoots]  = useState<string[]>([])
+  const [selectedRoots,   setSelectedRoots]   = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(ROOTS_KEY) ?? '[]') } catch { return [] }
+  })
+
+  // ── Fetch available roots on mount ──────────────────────────────────────────
+  useEffect(() => {
+    fetch('/roots')
+      .then(r => r.json() as Promise<string[]>)
+      .then(setAvailableRoots)
+      .catch(() => {/* non-critical */})
+  }, [])
+
+  // ── Mode chip toggle ────────────────────────────────────────────────────────
+  const toggleMode = (mode: ModeName) => {
+    setActiveModes(prev => {
+      const next = { ...prev, [mode]: !prev[mode] }
+      // Prevent deselecting all
+      if (!next.phrase && !next.and && !next.or) { return prev }
+      saveModes(next)
+      return next
+    })
+  }
+
+  // ── Root toggle ─────────────────────────────────────────────────────────────
+  const toggleRoot = (root: string) => {
+    setSelectedRoots(prev => {
+      const next = prev.includes(root) ? prev.filter(r => r !== root) : [...prev, root]
+      localStorage.setItem(ROOTS_KEY, JSON.stringify(next))
+      return next
+    })
+  }
 
   // ── Search ──────────────────────────────────────────────────────────────────
   const doSearch = async (q = query) => {
     const trimmed = q.trim()
-    if (!trimmed) return
+    if (!trimmed) { return }
     setLoading(true)
     setExpanded(new Set())
     setShowHistory(false)
     onStatus('Buscando…')
     try {
-      const data: SearchResult[] = await fetch(
-        `/search?q=${encodeURIComponent(trimmed)}&limit=${limit}`
-      ).then(r => r.json())
+      const modesStr = modesParam(activeModes)
+      const rootsStr = selectedRoots.join(',')
+      const url = `/search?q=${encodeURIComponent(trimmed)}&limit=${limit}` +
+        (modesStr ? `&modes=${modesStr}` : '') +
+        (rootsStr ? `&roots=${rootsStr}` : '')
+
+      const data: SearchResult[] = await fetch(url).then(r => r.json())
       setResults(data)
       setSearchedQuery(trimmed)
       setHistory(prev => pushHistory(trimmed, prev))
@@ -79,7 +138,7 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter')  { doSearch(); return }
     if (e.key === 'Escape') {
-      if (query) clearSearch()
+      if (query) { clearSearch() }
       else { setShowHistory(false); inputRef.current?.blur() }
     }
   }
@@ -88,11 +147,11 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
   const toggleExpanded = (i: number) =>
     setExpanded(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s })
 
-  const expandAll  = () => setExpanded(new Set(results.map((_, i) => i)))
+  const expandAll   = () => setExpanded(new Set(results.map((_, i) => i)))
   const collapseAll = () => setExpanded(new Set())
   const allExpanded = results.length > 0 && results.every((_, i) => expanded.has(i))
 
-  // ── Copy helpers ─────────────────────────────────────────────────────────────
+  // ── Copy helpers ──────────────────────────────────────────────────────────
   const copyPath = (r: SearchResult) => {
     const text = `${r.path.replace(/\\/g, '/').split('/').slice(-3).join('/')}:${r.line}`
     navigator.clipboard.writeText(text).then(() => onStatus(`Copiado: ${text}`))
@@ -180,6 +239,51 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
         </button>
       </div>
 
+      {/* ── Mode chips + Roots selector ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Mode toggle button */}
+        <button
+          onClick={() => setShowModes(prev => !prev)}
+          className="text-[10px] text-gh-muted hover:text-gh-text border border-gh-border rounded px-1.5 py-0.5 transition-colors"
+          title="Estrategias de búsqueda FTS"
+        >
+          {showModes ? '▲ modos' : '▼ modos'}
+        </button>
+
+        {showModes && (
+          <>
+            {(['phrase', 'and', 'or'] as ModeName[]).map(mode => (
+              <button
+                key={mode}
+                onClick={() => toggleMode(mode)}
+                title={mode === 'phrase' ? 'Frase exacta' : mode === 'and' ? 'Todas las palabras' : 'Alguna palabra'}
+                className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-colors
+                  ${activeModes[mode]
+                    ? 'bg-gh-accent/20 text-gh-accent border-gh-accent/40'
+                    : 'bg-gh-surface text-gh-muted border-gh-border opacity-50'}`}
+              >
+                {mode.toUpperCase()}
+              </button>
+            ))}
+          </>
+        )}
+
+        {/* Roots selector — only shown when multiple roots exist */}
+        {availableRoots.length > 1 && availableRoots.map(root => (
+          <button
+            key={root}
+            onClick={() => toggleRoot(root)}
+            title={`Filtrar por root: ${root}`}
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-colors
+              ${selectedRoots.includes(root)
+                ? 'bg-blue-900/30 text-blue-400 border-blue-700/40'
+                : 'bg-gh-surface text-gh-muted border-gh-border opacity-50'}`}
+          >
+            {root}
+          </button>
+        ))}
+      </div>
+
       {/* ── Status + expand controls ── */}
       <div className="flex items-center justify-between min-h-[16px]">
         {statusMsg && !loading && (
@@ -246,7 +350,7 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
 
         {/* Result cards */}
         {!loading && results.map((r, i) => {
-          const isExp  = expanded.has(i)
+          const isExp   = expanded.has(i)
           const relPath = r.path.replace(/\\/g, '/').split('/').slice(-3).join('/')
           return (
             <div key={i}
@@ -283,12 +387,20 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
                 </div>
               </div>
 
-              <button onClick={() => copyPath(r)}
-                className="text-xs text-gh-accent font-mono mb-2 hover:underline text-left block truncate w-full"
-                title="Click para copiar ruta"
-              >
-                {relPath}:{r.line}
-              </button>
+              {/* Path + root badge */}
+              <div className="flex items-center gap-1 mb-2">
+                {r.root && (
+                  <span className="text-[10px] font-mono bg-blue-900/30 text-blue-400 border border-blue-800/50 rounded px-1.5 py-0.5 shrink-0">
+                    {r.root}
+                  </span>
+                )}
+                <button onClick={() => copyPath(r)}
+                  className="text-xs text-gh-accent font-mono hover:underline text-left truncate"
+                  title="Click para copiar ruta"
+                >
+                  {relPath}:{r.line}
+                </button>
+              </div>
 
               <div
                 className={`overflow-hidden transition-all ${isExp ? '' : 'max-h-28'}`}
