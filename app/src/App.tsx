@@ -4,11 +4,12 @@ import { SearchView } from './components/SearchView'
 import { SkillsView } from './components/SkillsView'
 import { SkillPanel } from './components/SkillPanel'
 import { GraphView }  from './components/GraphView'
+import { RepoSearchView } from './components/RepoSearchView'
 import { useTheme }    from './hooks/useTheme'
 import { useFontSize } from './hooks/useFontSize'
 import type { Skill } from './types'
 
-type View = 'search' | 'skills' | 'graph'
+type View = 'search' | 'repo-search' | 'skills' | 'graph'
 
 export function App() {
   const { theme, setTheme }               = useTheme()
@@ -68,7 +69,7 @@ export function App() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-10 border-b border-gh-border flex items-center px-4 gap-3 shrink-0">
           <span className="text-sm font-medium">
-            {view === 'search' ? 'Knowledge Search' : view === 'skills' ? 'Skills' : 'Code Graph'}
+            {view === 'search' ? 'Knowledge Search' : view === 'repo-search' ? 'Repo Search' : view === 'skills' ? 'Skills' : 'Code Graph'}
           </span>
           <div className="flex-1" />
           {view === 'search' && (
@@ -89,6 +90,9 @@ export function App() {
 
         {view === 'search' && (
           <SearchView statusMsg={statusMsg} onStatus={setStatusMsg} inputRef={searchInputRef} />
+        )}
+        {view === 'repo-search' && (
+          <RepoSearchView />
         )}
         {view === 'skills' && (
           <SkillsView onOpen={setActiveSkill} active={activeSkill} />

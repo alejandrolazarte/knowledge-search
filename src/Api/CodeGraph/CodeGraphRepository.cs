@@ -6,6 +6,7 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
 {
     private const string DeleteNodesSql = "DELETE FROM code_nodes WHERE repo_name = @repoName";
     private const string DeleteEdgesSql = "DELETE FROM code_edges WHERE repo_name = @repoName";
+    private const string DeleteDocumentsSql = "DELETE FROM code_docs WHERE repo_name = @repoName";
     private const string UpsertRepoSql =
         "INSERT INTO code_repos(name, last_scanned) VALUES(@name, @lastScanned) " +
         "ON CONFLICT(name) DO UPDATE SET last_scanned = excluded.last_scanned";
@@ -32,6 +33,11 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
         "VALUES(@sourceRepo, @sourceIdentifier, @targetRepo, @targetIdentifier, @kind)";
     private const string SelectCrossRepoEdgesSql =
         "SELECT source_repo, source_identifier, target_repo, target_identifier, kind FROM cross_repo_edges";
+    private const string InsertDocumentSql =
+        "INSERT INTO code_docs(repo_name, identifier, name, kind, content, file_path, line) " +
+        "VALUES(@repoName, @identifier, @name, @kind, @content, @filePath, @line)";
+    private const string PathAllowedSql =
+        "SELECT COUNT(1) FROM code_nodes WHERE file_path = @filePath";
 
     private readonly SqliteConnection _connection;
 
@@ -52,6 +58,7 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
             UpsertRepository(repositoryName, transaction);
             InsertNodes(repositoryName, scanResult.Nodes, transaction);
             InsertEdges(repositoryName, scanResult.Edges, transaction);
+            InsertDocuments(repositoryName, BuildCodeDocuments(repositoryName, scanResult.Nodes), transaction);
             transaction.Commit();
         }
         catch
@@ -138,6 +145,77 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
         return names;
     }
 
+    public IReadOnlyList<CodeDocumentSearchResult> SearchCodeDocuments(
+        string query,
+        int limit,
+        SearchMode modes,
+        IReadOnlyList<string>? repositories,
+        IReadOnlyList<CodeNodeKind>? kinds)
+    {
+        var ftsQuery = DbService.BuildFtsQuery(query, modes);
+        var sql = "SELECT repo_name, identifier, name, kind, file_path, line, content, bm25(code_docs, 4, 8, 8, 3, 1) AS score " +
+            "FROM code_docs WHERE code_docs MATCH @query";
+
+        var repositoryFilters = repositories?
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? [];
+        var kindFilters = kinds?
+            .Distinct()
+            .Select(k => k.ToString())
+            .ToArray() ?? [];
+
+        if (repositoryFilters.Length > 0)
+        {
+            sql += " AND repo_name IN (" + string.Join(", ", repositoryFilters.Select((_, index) => $"@repo{index}")) + ")";
+        }
+
+        if (kindFilters.Length > 0)
+        {
+            sql += " AND kind IN (" + string.Join(", ", kindFilters.Select((_, index) => $"@kind{index}")) + ")";
+        }
+
+        sql += " ORDER BY score LIMIT @limit";
+
+        var results = new List<CodeDocumentSearchResult>();
+        using var command = new SqliteCommand(sql, _connection);
+        command.Parameters.AddWithValue("@query", ftsQuery);
+        command.Parameters.AddWithValue("@limit", Math.Clamp(limit, 1, 100));
+
+        for (var i = 0; i < repositoryFilters.Length; i++)
+        {
+            command.Parameters.AddWithValue($"@repo{i}", repositoryFilters[i]);
+        }
+
+        for (var i = 0; i < kindFilters.Length; i++)
+        {
+            command.Parameters.AddWithValue($"@kind{i}", kindFilters[i]);
+        }
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            results.Add(new CodeDocumentSearchResult(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                Enum.Parse<CodeNodeKind>(reader.GetString(3)),
+                reader.GetString(4),
+                reader.GetInt32(5),
+                reader.GetString(6),
+                reader.GetDouble(7)));
+        }
+
+        return results;
+    }
+
+    public bool IsCodePathAllowed(string fullPath)
+    {
+        using var command = new SqliteCommand(PathAllowedSql, _connection);
+        command.Parameters.AddWithValue("@filePath", fullPath);
+        return Convert.ToInt64(command.ExecuteScalar()!, System.Globalization.CultureInfo.InvariantCulture) > 0;
+    }
+
     public void SaveCrossRepoEdges(IReadOnlyList<CrossRepoCodeEdge> edges)
     {
         using var transaction = _connection.BeginTransaction();
@@ -200,6 +278,10 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
         using var deleteEdges = new SqliteCommand(DeleteEdgesSql, _connection, transaction);
         deleteEdges.Parameters.AddWithValue("@repoName", repositoryName);
         deleteEdges.ExecuteNonQuery();
+
+        using var deleteDocuments = new SqliteCommand(DeleteDocumentsSql, _connection, transaction);
+        deleteDocuments.Parameters.AddWithValue("@repoName", repositoryName);
+        deleteDocuments.ExecuteNonQuery();
     }
 
     private void UpsertRepository(string repositoryName, SqliteTransaction transaction)
@@ -241,6 +323,75 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
             command.Parameters.AddWithValue("@line", edge.Line);
             command.ExecuteNonQuery();
         }
+    }
+
+    private void InsertDocuments(string repositoryName, IReadOnlyList<CodeDocument> documents, SqliteTransaction transaction)
+    {
+        foreach (var document in documents)
+        {
+            using var command = new SqliteCommand(InsertDocumentSql, _connection, transaction);
+            command.Parameters.AddWithValue("@repoName", repositoryName);
+            command.Parameters.AddWithValue("@identifier", document.Identifier);
+            command.Parameters.AddWithValue("@name", document.Name);
+            command.Parameters.AddWithValue("@kind", document.Kind.ToString());
+            command.Parameters.AddWithValue("@content", document.Content);
+            command.Parameters.AddWithValue("@filePath", document.FilePath);
+            command.Parameters.AddWithValue("@line", document.Line);
+            command.ExecuteNonQuery();
+        }
+    }
+
+    private static List<CodeDocument> BuildCodeDocuments(string repositoryName, IReadOnlyList<CodeNode> nodes)
+    {
+        var documents = new List<CodeDocument>();
+        var uniqueNodes = nodes
+            .GroupBy(n => n.Identifier, StringComparer.Ordinal)
+            .Select(g => g.First())
+            .Where(n => File.Exists(n.FilePath))
+            .GroupBy(n => n.FilePath, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var fileGroup in uniqueNodes)
+        {
+            var lines = File.ReadAllLines(fileGroup.Key);
+            var fileNodes = fileGroup
+                .OrderBy(n => n.Line)
+                .ThenBy(n => n.Identifier, StringComparer.Ordinal)
+                .ToArray();
+
+            for (var i = 0; i < fileNodes.Length; i++)
+            {
+                var node = fileNodes[i];
+                var startLine = Math.Clamp(node.Line, 1, Math.Max(lines.Length, 1));
+                var nextLine = fileNodes
+                    .Skip(i + 1)
+                    .FirstOrDefault(n => n.Line > node.Line)?.Line;
+                var endLine = nextLine.HasValue
+                    ? nextLine.Value - 1
+                    : Math.Min(lines.Length, startLine + 80);
+
+                if (endLine < startLine)
+                {
+                    endLine = Math.Min(lines.Length, startLine + 40);
+                }
+
+                var content = string.Join("\n", lines.Skip(startLine - 1).Take(endLine - startLine + 1)).Trim();
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    continue;
+                }
+
+                documents.Add(new CodeDocument(
+                    repositoryName,
+                    node.Identifier,
+                    node.Name,
+                    node.Kind,
+                    node.FilePath,
+                    node.Line,
+                    content));
+            }
+        }
+
+        return documents;
     }
 
     private void ApplyPragmas()
@@ -292,6 +443,17 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
                 target_identifier TEXT NOT NULL,
                 kind TEXT NOT NULL
             )
+            """);
+        ExecuteSql("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS code_docs USING fts5(
+                repo_name,
+                identifier,
+                name,
+                kind,
+                content,
+                file_path UNINDEXED,
+                line UNINDEXED,
+                tokenize='trigram')
             """);
     }
 

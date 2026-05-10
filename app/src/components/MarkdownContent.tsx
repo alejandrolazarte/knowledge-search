@@ -11,6 +11,7 @@ import xml    from 'react-syntax-highlighter/dist/esm/languages/hljs/xml'
 import ts     from 'react-syntax-highlighter/dist/esm/languages/hljs/typescript'
 import js     from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript'
 import yaml   from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
+import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python'
 
 SyntaxHighlighter.registerLanguage('sql',        sql)
 SyntaxHighlighter.registerLanguage('csharp',     csharp)
@@ -25,6 +26,8 @@ SyntaxHighlighter.registerLanguage('ts',         ts)
 SyntaxHighlighter.registerLanguage('javascript', js)
 SyntaxHighlighter.registerLanguage('js',         js)
 SyntaxHighlighter.registerLanguage('yaml',       yaml)
+SyntaxHighlighter.registerLanguage('python',     python)
+SyntaxHighlighter.registerLanguage('py',         python)
 
 const ghDark = {
   ...githubGist,
