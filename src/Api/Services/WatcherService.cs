@@ -72,7 +72,27 @@ internal sealed class WatcherService(
                 existing.Dispose();
             }
 
-            _debounce[path] = new Timer(_ => ProcessChange(path, eventType), null, 500, Timeout.Infinite);
+            Timer? timer = null;
+            timer = new Timer(_ =>
+            {
+                try
+                {
+                    ProcessChange(path, eventType);
+                }
+                finally
+                {
+                    lock (_debounceLock)
+                    {
+                        if (_debounce.TryGetValue(path, out var current) && ReferenceEquals(current, timer))
+                        {
+                            _debounce.Remove(path);
+                            current.Dispose();
+                        }
+                    }
+                }
+            }, null, 500, Timeout.Infinite);
+
+            _debounce[path] = timer;
         }
     }
 

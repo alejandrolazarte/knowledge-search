@@ -57,6 +57,43 @@ public class When_DbServiceSearches : IDisposable
         result.Deleted.ShouldBe(0);
     }
 
+    [Fact]
+    public void Then_DuplicateRootNamesReceiveDistinctLabelsAndCanBeFiltered()
+    {
+        var baseDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var dbPath = Path.GetTempFileName();
+
+        try
+        {
+            var firstRoot = Path.Combine(baseDir, "alpha", "docs");
+            var secondRoot = Path.Combine(baseDir, "beta", "docs");
+            Directory.CreateDirectory(firstRoot);
+            Directory.CreateDirectory(secondRoot);
+            File.WriteAllText(Path.Combine(firstRoot, "first.md"), "# First\nshared needle first");
+            File.WriteAllText(Path.Combine(secondRoot, "second.md"), "# Second\nshared needle second");
+
+            using var sut = new DbService(dbPath, [firstRoot, secondRoot]);
+            sut.IndexDirectories();
+
+            var roots = sut.GetRootNames();
+            roots.ShouldBe(["alpha/docs", "beta/docs"]);
+
+            var results = sut.Search("shared needle", 5, roots: ["beta/docs"]);
+
+            results.ShouldHaveSingleItem();
+            results[0].Root.ShouldBe("beta/docs");
+            results[0].Title.ShouldBe("second");
+        }
+        finally
+        {
+            if (Directory.Exists(baseDir))
+            {
+                Directory.Delete(baseDir, recursive: true);
+            }
+            File.Delete(dbPath);
+        }
+    }
+
     public void Dispose()
     {
         _sut.Dispose();

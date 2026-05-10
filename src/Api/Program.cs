@@ -6,15 +6,23 @@ builder.WebHost.UseUrls("http://localhost:5111");
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 
-var dbPath = builder.Configuration["KnowledgeDb"]
+var dbPath = Environment.GetEnvironmentVariable("KNOWLEDGE_DB")
+    ?? builder.Configuration["KnowledgeDb"]
     ?? Path.GetFullPath("../knowledge.db");
 
-var roots = (builder.Configuration["KnowledgeDirs"] ?? string.Empty)
+var configuredRoots = Environment.GetEnvironmentVariable("KNOWLEDGE_DIRS")
+    ?? builder.Configuration["KnowledgeDirs"]
+    ?? Environment.GetEnvironmentVariable("KNOWLEDGE_DIR")
+    ?? builder.Configuration["KnowledgeDir"]
+    ?? Path.GetFullPath("../knowledge");
+
+var roots = configuredRoots
     .Split(';', StringSplitOptions.RemoveEmptyEntries)
     .Select(Path.GetFullPath)
     .ToArray();
 
-var skillsDir = builder.Configuration["SkillsDir"]
+var skillsDir = Environment.GetEnvironmentVariable("SKILLS_DIR")
+    ?? builder.Configuration["SkillsDir"]
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
 
 var indexHtmlPath = File.Exists(Path.Combine(Directory.GetCurrentDirectory(), "index.html"))

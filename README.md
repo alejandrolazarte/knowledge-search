@@ -1,6 +1,6 @@
 # knowledge-search
 
-Motor de búsqueda full-text para el directorio `knowledge/` y visor de skills. Indexa archivos Markdown en SQLite con FTS5 (trigramas + BM25). Incluye una UI en React + Tailwind con tema dark/light.
+Motor de búsqueda full-text para uno o más directorios de conocimiento y visor de skills. Indexa archivos Markdown en SQLite con FTS5 (trigramas + BM25). Incluye una UI en React + Tailwind con tema dark/light.
 
 ## Requisitos
 
@@ -31,7 +31,7 @@ Abre `http://localhost:5111` en el navegador.
 
 ### Vistas
 
-- **Knowledge Search**: búsqueda FTS con BM25, copia path con un clic, botón Re-index
+- **Knowledge Search**: búsqueda FTS con BM25, filtros por root/modo, copia path con un clic, botón Re-index
 - **Skills**: grid con todas las skills de `~/.claude/skills`, filtro por nombre/descripción, panel lateral con markdown renderizado
 
 ### Variables de entorno
@@ -39,15 +39,19 @@ Abre `http://localhost:5111` en el navegador.
 | Variable | Default |
 |---|---|
 | `KNOWLEDGE_DB` | `../knowledge.db` (relativo al `Api/`) |
-| `KNOWLEDGE_DIR` | directorio raíz del repo |
+| `KnowledgeDirs` / `KNOWLEDGE_DIRS` | `../knowledge` (relativo al `Api/`), múltiples roots separados por `;` |
+| `KnowledgeDir` / `KNOWLEDGE_DIR` | compatibilidad con un único root |
 | `SKILLS_DIR` | `~/.claude/skills` |
 
 ### API REST
 
 | Endpoint | Descripción |
 |---|---|
-| `GET /search?q=texto&limit=5` | Busca en el índice (BM25) |
+| `GET /search?q=texto&limit=5&modes=phrase,and,or&roots=knowledge` | Busca en el índice (BM25) |
 | `POST /index` | Re-indexa el directorio (incremental) |
+| `GET /roots` | Lista roots configurados |
+| `GET /file?path=...` | Lee un archivo permitido dentro de un root |
+| `GET /image?path=...` | Sirve imágenes locales referenciadas por Markdown |
 | `GET /skills` | Lista de skills (nombre, descripción) |
 | `GET /skills/{dir}` | Contenido crudo de una skill |
 | `GET /health` | Health check |

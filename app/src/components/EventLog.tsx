@@ -5,6 +5,7 @@ const TYPE_STYLE: Record<LogEvent['type'], string> = {
   added:   'bg-green-500/20 text-green-400',
   updated: 'bg-blue-500/20  text-blue-400',
   deleted: 'bg-red-500/20   text-red-400',
+  error:   'bg-yellow-500/20 text-yellow-300',
 }
 
 interface Props {
