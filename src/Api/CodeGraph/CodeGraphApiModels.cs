@@ -24,3 +24,16 @@ internal record ScanSummaryApiResponse(
     int EdgesFound);
 
 internal record ScanDirectoryRequest(string DirectoryPath);
+
+internal record CodeSearchNodeApiResponse(string Identifier, string Name, string Kind, string FilePath, int Line, int Weight)
+{
+    internal static CodeSearchNodeApiResponse From(CodeNode node, int weight) =>
+        new(node.Identifier, node.Name, node.Kind.ToString(), node.FilePath, node.Line, weight);
+}
+
+internal record CodeSubgraphApiResponse(
+    IReadOnlyList<CodeSearchNodeApiResponse> Nodes,
+    IReadOnlyList<CodeEdgeApiResponse> Edges,
+    string Query,
+    int Depth,
+    int TotalFound);

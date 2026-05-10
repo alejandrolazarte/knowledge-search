@@ -27,4 +27,6 @@ public record LogEvent(
 [JsonSerializable(typeof(CodeGraphApiResponse))]
 [JsonSerializable(typeof(List<CodeNodeApiResponse>))]
 [JsonSerializable(typeof(List<CodeEdgeApiResponse>))]
+[JsonSerializable(typeof(CodeSubgraphApiResponse))]
+[JsonSerializable(typeof(List<CodeSearchNodeApiResponse>))]
 internal partial class AppJsonContext : JsonSerializerContext { }

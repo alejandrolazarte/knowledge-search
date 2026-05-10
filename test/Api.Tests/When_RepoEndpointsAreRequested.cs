@@ -120,6 +120,48 @@ public class When_RepoEndpointsAreRequested : IDisposable
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Then_GetSearchReturnsSubgraphForMatchingQuery()
+    {
+        var userServiceNode = new CodeNode("App.UserService", "UserService", CodeNodeKind.Class, "/src/UserService.cs", 1);
+        var subgraphResult = new CodeSubgraphResult(
+            [userServiceNode],
+            [],
+            new Dictionary<string, int> { ["App.UserService"] = 0 },
+            TotalFound: 1);
+
+        _mockRepository.Setup(r => r.RepositoryExists("my-repo")).Returns(true);
+        _mockService.Setup(s => s.SearchSubgraph("my-repo", "UserService", 2)).Returns(subgraphResult);
+
+        var response = await _client.GetAsync("/repos/my-repo/search?q=UserService&depth=2");
+        var body = await response.Content.ReadFromJsonAsync<CodeSubgraphApiResponse>();
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        body.ShouldNotBeNull();
+        body.Nodes.ShouldHaveSingleItem();
+        body.Nodes[0].Name.ShouldBe("UserService");
+        body.Query.ShouldBe("UserService");
+        body.TotalFound.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Then_GetSearchReturnsNotFoundForUnknownRepository()
+    {
+        _mockRepository.Setup(r => r.RepositoryExists("nonexistent")).Returns(false);
+
+        var response = await _client.GetAsync("/repos/nonexistent/search?q=Service");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Then_GetSearchReturnsBadRequestWhenQueryIsEmpty()
+    {
+        var response = await _client.GetAsync("/repos/my-repo/search?q=");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
     public void Dispose()
     {
         _client.Dispose();

@@ -23,6 +23,9 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
         "SELECT COUNT(1) FROM code_repos WHERE name = @name";
     private const string SelectRepoNamesSql =
         "SELECT name FROM code_repos ORDER BY name";
+    private const string SearchNodesSql =
+        "SELECT identifier, name, kind, file_path, line FROM code_nodes " +
+        "WHERE repo_name = @repoName AND LOWER(name) LIKE LOWER(@query)";
 
     private readonly SqliteConnection _connection;
 
@@ -94,6 +97,26 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
         }
 
         return edges;
+    }
+
+    public IReadOnlyList<CodeNode> SearchNodes(string repositoryName, string query)
+    {
+        var nodes = new List<CodeNode>();
+        using var command = new SqliteCommand(SearchNodesSql, _connection);
+        command.Parameters.AddWithValue("@repoName", repositoryName);
+        command.Parameters.AddWithValue("@query", $"%{query}%");
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            nodes.Add(new CodeNode(
+                reader.GetString(0),
+                reader.GetString(1),
+                Enum.Parse<CodeNodeKind>(reader.GetString(2)),
+                reader.GetString(3),
+                reader.GetInt32(4)));
+        }
+
+        return nodes;
     }
 
     public IReadOnlyList<string> GetRepositoryNames()

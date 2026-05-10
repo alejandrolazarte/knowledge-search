@@ -44,5 +44,32 @@ internal static class CodeGraphEndpoints
                 scanResult.Nodes.Count,
                 scanResult.Edges.Count));
         });
+
+        app.MapGet("/repos/{name}/search", (string name, string? q, int? depth, ICodeGraphRepository repository, ICodeGraphService graphService) =>
+        {
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                return Results.BadRequest(new ErrorResult("El parámetro q es requerido."));
+            }
+
+            if (!repository.RepositoryExists(name))
+            {
+                return Results.NotFound();
+            }
+
+            var actualDepth = Math.Clamp(depth ?? 2, 0, 5);
+            var subgraph = graphService.SearchSubgraph(name, q, actualDepth);
+
+            var response = new CodeSubgraphApiResponse(
+                subgraph.Nodes
+                    .Select(n => CodeSearchNodeApiResponse.From(n, subgraph.NodeWeights.GetValueOrDefault(n.Identifier)))
+                    .ToList(),
+                subgraph.Edges.Select(CodeEdgeApiResponse.From).ToList(),
+                q,
+                actualDepth,
+                subgraph.TotalFound);
+
+            return Results.Ok(response);
+        });
     }
 }

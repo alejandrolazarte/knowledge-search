@@ -7,4 +7,5 @@ internal interface ICodeGraphRepository : IDisposable
     IReadOnlyList<CodeNode> GetNodes(string repositoryName);
     IReadOnlyList<CodeEdge> GetEdges(string repositoryName);
     IReadOnlyList<string> GetRepositoryNames();
+    IReadOnlyList<CodeNode> SearchNodes(string repositoryName, string query);
 }
