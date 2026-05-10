@@ -38,6 +38,15 @@ builder.Services.AddSingleton<ILogService>(new LogService(logPath));
 builder.Services.AddHostedService(serviceProvider =>
     new WatcherService(roots, serviceProvider.GetRequiredService<IDbService>(), serviceProvider.GetRequiredService<ILogService>()));
 
+builder.Services.AddSingleton<ICodeGraphRepository>(_ => new CodeGraphRepository(dbPath));
+builder.Services.AddKeyedSingleton<ISourceFileParser, CSharpParser>(".cs");
+foreach (var typeScriptExtension in new[] { ".ts", ".tsx", ".js", ".jsx", ".mjs" })
+{
+    builder.Services.AddKeyedSingleton<ISourceFileParser, TypeScriptParser>(typeScriptExtension);
+}
+builder.Services.AddKeyedSingleton<ISourceFileParser, PythonParser>(".py");
+builder.Services.AddSingleton<ICodeGraphService, CodeGraphService>();
+
 var app = builder.Build();
 var logger = app.Logger;
 
@@ -63,6 +72,7 @@ app.MapStaticRoutes(indexHtmlPath, staticDir);
 app.MapSkillsRoutes(skillsDir);
 app.MapSearchRoutes();
 app.MapEventsRoutes();
+app.MapCodeGraphRoutes();
 
 app.Run();
 
