@@ -20,6 +20,7 @@ interface Props { result: CrossRepoSubgraphResponse }
 
 export function GraphCanvas({ result }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const nodesRef = useRef<NodeSim[]>([])
   const edgesRef = useRef<EdgeSim[]>([])
   const rafRef = useRef(0)
@@ -131,11 +132,20 @@ export function GraphCanvas({ result }: Props) {
     setPanOrigin({ x: e.clientX, y: e.clientY })
   }
   const onMouseUp = () => setPanOrigin(null)
-  const onWheel = (e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault()
-    const f = e.deltaY > 0 ? 1.12 : 0.89
-    setViewBox(v => ({ ...v, w: v.w * f, h: v.h * f }))
-  }
+
+  // Bloquear zoom del navegador sobre el grafo — listener nativo con passive:false
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const f = e.deltaY > 0 ? 1.12 : 0.89
+      setViewBox(v => ({ ...v, w: v.w * f, h: v.h * f }))
+    }
+    el.addEventListener('wheel', onWheelNative, { passive: false })
+    return () => el.removeEventListener('wheel', onWheelNative)
+  }, [])
 
   if (result.nodes.length > MAX_NODES) {
     return (
@@ -151,11 +161,12 @@ export function GraphCanvas({ result }: Props) {
     : null
 
   return (
+    <div ref={containerRef} className="w-full h-full overflow-hidden">
     <svg ref={svgRef} className="w-full h-full select-none"
       style={{ cursor: panOrigin ? 'grabbing' : 'grab' }}
       viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
       onMouseDown={onMouseDown} onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}
+      onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
       onClick={() => setSelected(null)}
     >
       <defs>
@@ -218,5 +229,6 @@ export function GraphCanvas({ result }: Props) {
         )
       })}
     </svg>
+    </div>
   )
 }
