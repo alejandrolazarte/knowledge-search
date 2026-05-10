@@ -53,7 +53,9 @@ internal sealed class CodeGraphService(
             return new CodeSubgraphResult([], [], new Dictionary<string, int>(), 0);
         }
 
-        var allNodes = repository.GetNodes(repositoryName).ToDictionary(n => n.Identifier, StringComparer.Ordinal);
+        var allNodes = repository.GetNodes(repositoryName)
+            .GroupBy(n => n.Identifier, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         var allEdges = repository.GetEdges(repositoryName);
 
         var adjacency = BuildBidirectionalAdjacency(allEdges);

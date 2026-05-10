@@ -106,6 +106,25 @@ public class When_CodeGraphServiceScans : IDisposable
         result.Nodes.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Then_DeduplicatesNodesWithSameIdentifier()
+    {
+        WriteSourceFile("Partial1.cs", """
+            namespace MyApp;
+            public partial class ConfigureServices { }
+            """);
+        WriteSourceFile("Partial2.cs", """
+            namespace MyApp;
+            public partial class ConfigureServices { }
+            """);
+
+        BuildService([".cs"]).ScanDirectory(_temporaryDirectory);
+
+        _repository!.GetNodes(Path.GetFileName(_temporaryDirectory))
+            .ShouldHaveSingleItem()
+            .Identifier.ShouldBe("MyApp.ConfigureServices");
+    }
+
     public void Dispose()
     {
         _repository?.Dispose();

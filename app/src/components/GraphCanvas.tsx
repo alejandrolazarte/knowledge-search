@@ -4,7 +4,7 @@ import type { CrossRepoSubgraphResponse } from '../types'
 const REPO_PALETTE = ['#58a6ff', '#56d364', '#e3b341', '#f78166', '#d2a8ff', '#79c0ff', '#ffa657', '#ff7b72']
 const KIND_ABBREV: Record<string, string> = { Class: 'C', Interface: 'I', Record: 'R', Enum: 'E', Method: 'M' }
 const NODE_R = 20
-const MAX_NODES = 80
+const MAX_NODES = 250
 const MAX_ITER = 350
 
 function repoColor(name: string): string {
