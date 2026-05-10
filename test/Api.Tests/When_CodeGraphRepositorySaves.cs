@@ -113,6 +113,20 @@ public class When_CodeGraphRepositorySaves : IDisposable
     }
 
     [Fact]
+    public void Then_RepositoryExistsReturnsTrueAfterSaving()
+    {
+        _sut.SaveScanResult("my-repo", new CodeGraphScanResult([], [], 0, 0));
+
+        _sut.RepositoryExists("my-repo").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Then_RepositoryExistsReturnsFalseForUnknownRepository()
+    {
+        _sut.RepositoryExists("nonexistent-repo").ShouldBeFalse();
+    }
+
+    [Fact]
     public void Then_NodeLineNumberIsPreserved()
     {
         var nodes = new List<CodeNode>

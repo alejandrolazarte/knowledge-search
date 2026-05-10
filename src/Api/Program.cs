@@ -72,6 +72,7 @@ app.MapStaticRoutes(indexHtmlPath, staticDir);
 app.MapSkillsRoutes(skillsDir);
 app.MapSearchRoutes();
 app.MapEventsRoutes();
+app.MapCodeGraphRoutes();
 
 app.Run();
 

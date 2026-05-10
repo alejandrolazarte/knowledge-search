@@ -22,4 +22,9 @@ public record LogEvent(
 [JsonSerializable(typeof(HealthResult))]
 [JsonSerializable(typeof(ErrorResult))]
 [JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(ScanDirectoryRequest))]
+[JsonSerializable(typeof(ScanSummaryApiResponse))]
+[JsonSerializable(typeof(CodeGraphApiResponse))]
+[JsonSerializable(typeof(List<CodeNodeApiResponse>))]
+[JsonSerializable(typeof(List<CodeEdgeApiResponse>))]
 internal partial class AppJsonContext : JsonSerializerContext { }

@@ -19,6 +19,8 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
         "SELECT identifier, name, kind, file_path, line FROM code_nodes WHERE repo_name = @repoName";
     private const string SelectEdgesSql =
         "SELECT source_identifier, target_identifier, kind, line FROM code_edges WHERE repo_name = @repoName";
+    private const string RepositoryExistsSql =
+        "SELECT COUNT(1) FROM code_repos WHERE name = @name";
     private const string SelectRepoNamesSql =
         "SELECT name FROM code_repos ORDER BY name";
 
@@ -48,6 +50,13 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
             transaction.Rollback();
             throw;
         }
+    }
+
+    public bool RepositoryExists(string repositoryName)
+    {
+        using var command = new SqliteCommand(RepositoryExistsSql, _connection);
+        command.Parameters.AddWithValue("@name", repositoryName);
+        return Convert.ToInt64(command.ExecuteScalar()!, System.Globalization.CultureInfo.InvariantCulture) > 0;
     }
 
     public IReadOnlyList<CodeNode> GetNodes(string repositoryName)
