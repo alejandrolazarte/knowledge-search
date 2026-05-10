@@ -3,11 +3,12 @@ import { Sidebar }    from './components/Sidebar'
 import { SearchView } from './components/SearchView'
 import { SkillsView } from './components/SkillsView'
 import { SkillPanel } from './components/SkillPanel'
+import { GraphView }  from './components/GraphView'
 import { useTheme }    from './hooks/useTheme'
 import { useFontSize } from './hooks/useFontSize'
 import type { Skill } from './types'
 
-type View = 'search' | 'skills'
+type View = 'search' | 'skills' | 'graph'
 
 export function App() {
   const { theme, setTheme }               = useTheme()
@@ -67,7 +68,7 @@ export function App() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-10 border-b border-gh-border flex items-center px-4 gap-3 shrink-0">
           <span className="text-sm font-medium">
-            {view === 'search' ? 'Knowledge Search' : 'Skills'}
+            {view === 'search' ? 'Knowledge Search' : view === 'skills' ? 'Skills' : 'Code Graph'}
           </span>
           <div className="flex-1" />
           {view === 'search' && (
@@ -91,6 +92,9 @@ export function App() {
         )}
         {view === 'skills' && (
           <SkillsView onOpen={setActiveSkill} active={activeSkill} />
+        )}
+        {view === 'graph' && (
+          <GraphView />
         )}
       </div>
 

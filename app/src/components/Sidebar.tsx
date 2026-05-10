@@ -4,7 +4,7 @@ import type { Theme } from '../hooks/useTheme'
 import type { FontSize } from '../hooks/useFontSize'
 import { EventLog } from './EventLog'
 
-type View = 'search' | 'skills'
+type View = 'search' | 'skills' | 'graph'
 
 interface Props {
   view:      View
@@ -54,6 +54,8 @@ export function Sidebar({ view, onView, theme, onTheme, fontSize, onFontSize }: 
           active={view === 'search'} collapsed={collapsed} onClick={() => onView('search')} />
         <NavItem icon={<SkillsIcon />} label="Skills"
           active={view === 'skills'} collapsed={collapsed} onClick={() => onView('skills')} />
+        <NavItem icon={<GraphIcon />} label="Code Graph"
+          active={view === 'graph'} collapsed={collapsed} onClick={() => onView('graph')} />
 
         <div className="pt-1 mt-1 border-t border-gh-border/50">
           <EventLog collapsed={collapsed} />
@@ -143,5 +145,10 @@ function SearchIcon() {
 function SkillsIcon() {
   return <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+  </svg>
+}
+function GraphIcon() {
+  return <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z"/>
   </svg>
 }
