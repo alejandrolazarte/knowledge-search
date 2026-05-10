@@ -16,6 +16,8 @@ export default defineConfig({
       '/file':   'http://localhost:5111',
       '/image':  'http://localhost:5111',
       '/log':    'http://localhost:5111',
+      '/roots':  'http://localhost:5111',
+      '/repos':  'http://localhost:5111',
       '/events': { target: 'http://localhost:5111', changeOrigin: true },
     }
   }

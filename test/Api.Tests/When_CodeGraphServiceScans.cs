@@ -1,4 +1,5 @@
 using KnowledgeSearch;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -8,7 +9,8 @@ namespace Api.Tests;
 public class When_CodeGraphServiceScans : IDisposable
 {
     private readonly string _temporaryDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-    private readonly string _dbPath = Path.GetTempFileName();
+    private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.db");
+    private CodeGraphRepository? _repository;
 
     public When_CodeGraphServiceScans() => Directory.CreateDirectory(_temporaryDirectory);
 
@@ -106,8 +108,13 @@ public class When_CodeGraphServiceScans : IDisposable
 
     public void Dispose()
     {
-        Directory.Delete(_temporaryDirectory, recursive: true);
-        File.Delete(_dbPath);
+        _repository?.Dispose();
+        SqliteConnection.ClearAllPools();
+
+        try { Directory.Delete(_temporaryDirectory, recursive: true); } catch { }
+        try { File.Delete(_dbPath); } catch { }
+        try { File.Delete(_dbPath + "-wal"); } catch { }
+        try { File.Delete(_dbPath + "-shm"); } catch { }
         GC.SuppressFinalize(this);
     }
 
@@ -132,8 +139,9 @@ public class When_CodeGraphServiceScans : IDisposable
             services.AddKeyedSingleton<ISourceFileParser, PythonParser>(".py");
         }
 
-        var repository = new CodeGraphRepository(_dbPath);
-        return new CodeGraphService(services.BuildServiceProvider(), repository);
+        _repository?.Dispose();
+        _repository = new CodeGraphRepository(_dbPath);
+        return new CodeGraphService(services.BuildServiceProvider(), _repository);
     }
 
     private void WriteSourceFile(string relativePath, string sourceCode)
