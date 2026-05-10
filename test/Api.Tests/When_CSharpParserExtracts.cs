@@ -164,7 +164,11 @@ public class When_CSharpParserExtracts : IDisposable
         result.Edges.ShouldBeEmpty();
     }
 
-    public void Dispose() => Directory.Delete(_temporaryDirectory, recursive: true);
+    public void Dispose()
+    {
+        Directory.Delete(_temporaryDirectory, recursive: true);
+        GC.SuppressFinalize(this);
+    }
 
     private string WriteSourceFile(string fileName, string sourceCode)
     {

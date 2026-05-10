@@ -4,12 +4,12 @@ namespace KnowledgeSearch;
 
 internal sealed class TypeScriptParser : ISourceFileParser
 {
-    private static readonly IReadOnlySet<string> SupportedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".ts", ".tsx", ".js", ".jsx", ".mjs",
     };
 
-    private static readonly IReadOnlySet<string> ControlFlowKeywords = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly HashSet<string> ControlFlowKeywords = new(StringComparer.Ordinal)
     {
         "if", "for", "while", "switch", "catch", "else", "do", "try",
         "return", "typeof", "instanceof", "delete", "void", "throw", "await",
