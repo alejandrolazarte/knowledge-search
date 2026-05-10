@@ -45,7 +45,13 @@ internal static class CodeGraphEndpoints
                 scanResult.Edges.Count));
         });
 
-        app.MapGet("/repos/search", (string? q, int? depth, ICodeGraphService graphService) =>
+        app.MapPost("/repos/cross-ref", (ICodeGraphService graphService) =>
+        {
+            var crossRepoEdges = graphService.BuildCrossRepoEdges();
+            return Results.Ok(new CrossRefSummaryApiResponse(crossRepoEdges.Count));
+        });
+
+        app.MapGet("/repos/search", (string? q, int? depth, ICodeGraphRepository repository, ICodeGraphService graphService) =>
         {
             if (string.IsNullOrWhiteSpace(q))
             {
@@ -56,11 +62,23 @@ internal static class CodeGraphEndpoints
             var subgraph = graphService.SearchSubgraphAcrossRepositories(q, actualDepth);
             var weightKey = (RepositoryBoundCodeNode n) => $"{n.RepositoryName}:{n.Node.Identifier}";
 
+            var allCrossRepoEdges = repository.GetCrossRepoEdges();
+            var visitedIdentifiers = subgraph.Nodes
+                .Select(n => (n.RepositoryName, n.Node.Identifier))
+                .ToHashSet();
+
+            var relevantCrossRepoLinks = allCrossRepoEdges
+                .Where(e => visitedIdentifiers.Contains((e.SourceRepositoryName, e.SourceIdentifier))
+                         || visitedIdentifiers.Contains((e.TargetRepositoryName, e.TargetIdentifier)))
+                .Select(CrossRepoLinkApiResponse.From)
+                .ToList();
+
             var response = new CrossRepoSubgraphApiResponse(
                 subgraph.Nodes
                     .Select(n => CrossRepoSearchNodeApiResponse.From(n, subgraph.NodeWeights.GetValueOrDefault(weightKey(n))))
                     .ToList(),
                 subgraph.Edges.Select(CrossRepoSearchEdgeApiResponse.From).ToList(),
+                relevantCrossRepoLinks,
                 q,
                 actualDepth,
                 subgraph.TotalFound);

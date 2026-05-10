@@ -177,6 +177,7 @@ public class When_RepoEndpointsAreRequested : IDisposable
             TotalFound: 2);
 
         _mockService.Setup(s => s.SearchSubgraphAcrossRepositories("IntegrationEvent", 2)).Returns(crossRepoResult);
+        _mockRepository.Setup(r => r.GetCrossRepoEdges()).Returns([]);
 
         var response = await _client.GetAsync("/repos/search?q=IntegrationEvent&depth=2");
         var body = await response.Content.ReadFromJsonAsync<CrossRepoSubgraphApiResponse>();

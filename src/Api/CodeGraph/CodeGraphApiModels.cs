@@ -75,6 +75,20 @@ internal record CrossRepoSearchEdgeApiResponse(
 internal record CrossRepoSubgraphApiResponse(
     IReadOnlyList<CrossRepoSearchNodeApiResponse> Nodes,
     IReadOnlyList<CrossRepoSearchEdgeApiResponse> Edges,
+    IReadOnlyList<CrossRepoLinkApiResponse> CrossRepoLinks,
     string Query,
     int Depth,
     int TotalFound);
+
+internal record CrossRepoLinkApiResponse(
+    string SourceRepositoryName,
+    string SourceIdentifier,
+    string TargetRepositoryName,
+    string TargetIdentifier,
+    string Kind)
+{
+    internal static CrossRepoLinkApiResponse From(CrossRepoCodeEdge edge) =>
+        new(edge.SourceRepositoryName, edge.SourceIdentifier, edge.TargetRepositoryName, edge.TargetIdentifier, edge.Kind.ToString());
+}
+
+internal record CrossRefSummaryApiResponse(int CrossRepoEdgesFound);

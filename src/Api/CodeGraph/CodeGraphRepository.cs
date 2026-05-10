@@ -26,6 +26,12 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
     private const string SearchNodesSql =
         "SELECT identifier, name, kind, file_path, line FROM code_nodes " +
         "WHERE repo_name = @repoName AND LOWER(name) LIKE LOWER(@query)";
+    private const string DeleteCrossRepoEdgesSql = "DELETE FROM cross_repo_edges";
+    private const string InsertCrossRepoEdgeSql =
+        "INSERT INTO cross_repo_edges(source_repo, source_identifier, target_repo, target_identifier, kind) " +
+        "VALUES(@sourceRepo, @sourceIdentifier, @targetRepo, @targetIdentifier, @kind)";
+    private const string SelectCrossRepoEdgesSql =
+        "SELECT source_repo, source_identifier, target_repo, target_identifier, kind FROM cross_repo_edges";
 
     private readonly SqliteConnection _connection;
 
@@ -132,6 +138,52 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
         return names;
     }
 
+    public void SaveCrossRepoEdges(IReadOnlyList<CrossRepoCodeEdge> edges)
+    {
+        using var transaction = _connection.BeginTransaction();
+        try
+        {
+            using var deleteCommand = new SqliteCommand(DeleteCrossRepoEdgesSql, _connection, transaction);
+            deleteCommand.ExecuteNonQuery();
+
+            foreach (var edge in edges)
+            {
+                using var insertCommand = new SqliteCommand(InsertCrossRepoEdgeSql, _connection, transaction);
+                insertCommand.Parameters.AddWithValue("@sourceRepo", edge.SourceRepositoryName);
+                insertCommand.Parameters.AddWithValue("@sourceIdentifier", edge.SourceIdentifier);
+                insertCommand.Parameters.AddWithValue("@targetRepo", edge.TargetRepositoryName);
+                insertCommand.Parameters.AddWithValue("@targetIdentifier", edge.TargetIdentifier);
+                insertCommand.Parameters.AddWithValue("@kind", edge.Kind.ToString());
+                insertCommand.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    public IReadOnlyList<CrossRepoCodeEdge> GetCrossRepoEdges()
+    {
+        var edges = new List<CrossRepoCodeEdge>();
+        using var command = new SqliteCommand(SelectCrossRepoEdgesSql, _connection);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            edges.Add(new CrossRepoCodeEdge(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                Enum.Parse<CrossRepoEdgeKind>(reader.GetString(4))));
+        }
+
+        return edges;
+    }
+
     public void Dispose()
     {
         _connection.Dispose();
@@ -227,6 +279,16 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
             """);
         ExecuteSql("CREATE INDEX IF NOT EXISTS idx_code_nodes_repo ON code_nodes(repo_name)");
         ExecuteSql("CREATE INDEX IF NOT EXISTS idx_code_edges_repo ON code_edges(repo_name)");
+        ExecuteSql("""
+            CREATE TABLE IF NOT EXISTS cross_repo_edges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_repo TEXT NOT NULL,
+                source_identifier TEXT NOT NULL,
+                target_repo TEXT NOT NULL,
+                target_identifier TEXT NOT NULL,
+                kind TEXT NOT NULL
+            )
+            """);
     }
 
     private void ExecuteSql(string sql)

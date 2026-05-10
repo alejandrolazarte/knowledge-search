@@ -134,6 +134,79 @@ internal sealed class CodeGraphService(
         return new CrossRepoSubgraphResult(resultNodes, resultEdges, nodeWeights, totalFound);
     }
 
+    private const int CrossRepoMinimumNodeNameLength = 8;
+
+    public IReadOnlyList<CrossRepoCodeEdge> BuildCrossRepoEdges()
+    {
+        var allRepositoryNames = repository.GetRepositoryNames();
+
+        if (allRepositoryNames.Count < 2)
+        {
+            return [];
+        }
+
+        var nodesByRepo = allRepositoryNames.ToDictionary(
+            repoName => repoName,
+            repoName => repository.GetNodes(repoName),
+            StringComparer.Ordinal);
+
+        var edgesByRepo = allRepositoryNames.ToDictionary(
+            repoName => repoName,
+            repoName => repository.GetEdges(repoName),
+            StringComparer.Ordinal);
+
+        var crossRepoEdges = new HashSet<(string SourceRepo, string SourceId, string TargetRepo, string TargetId)>();
+
+        foreach (var (candidateRepo, candidateNodes) in nodesByRepo)
+        {
+            var qualifiedCandidateNodes = candidateNodes
+                .Where(n => n.Name.Length >= CrossRepoMinimumNodeNameLength)
+                .ToList();
+
+            if (qualifiedCandidateNodes.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var (searchRepo, searchNodes) in nodesByRepo)
+            {
+                if (searchRepo == candidateRepo)
+                {
+                    continue;
+                }
+
+                var searchRepoEdges = edgesByRepo[searchRepo];
+
+                foreach (var candidateNode in qualifiedCandidateNodes)
+                {
+                    foreach (var searchNode in searchNodes)
+                    {
+                        if (searchNode.Name.Contains(candidateNode.Name, StringComparison.Ordinal))
+                        {
+                            crossRepoEdges.Add((searchRepo, searchNode.Identifier, candidateRepo, candidateNode.Identifier));
+                        }
+                    }
+
+                    foreach (var edge in searchRepoEdges)
+                    {
+                        if (edge.TargetIdentifier.Contains(candidateNode.Name, StringComparison.Ordinal))
+                        {
+                            crossRepoEdges.Add((searchRepo, edge.SourceIdentifier, candidateRepo, candidateNode.Identifier));
+                        }
+                    }
+                }
+            }
+        }
+
+        var result = crossRepoEdges
+            .Select(e => new CrossRepoCodeEdge(e.SourceRepo, e.SourceId, e.TargetRepo, e.TargetId, CrossRepoEdgeKind.References))
+            .ToList();
+
+        repository.SaveCrossRepoEdges(result);
+
+        return result;
+    }
+
     private static Dictionary<string, HashSet<string>> BuildBidirectionalAdjacency(IReadOnlyList<CodeEdge> edges)
     {
         var adjacency = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);

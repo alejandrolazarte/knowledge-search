@@ -8,4 +8,6 @@ internal interface ICodeGraphRepository : IDisposable
     IReadOnlyList<CodeEdge> GetEdges(string repositoryName);
     IReadOnlyList<string> GetRepositoryNames();
     IReadOnlyList<CodeNode> SearchNodes(string repositoryName, string query);
+    void SaveCrossRepoEdges(IReadOnlyList<CrossRepoCodeEdge> edges);
+    IReadOnlyList<CrossRepoCodeEdge> GetCrossRepoEdges();
 }

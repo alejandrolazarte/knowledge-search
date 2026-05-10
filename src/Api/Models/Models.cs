@@ -32,4 +32,6 @@ public record LogEvent(
 [JsonSerializable(typeof(CrossRepoSubgraphApiResponse))]
 [JsonSerializable(typeof(List<CrossRepoSearchNodeApiResponse>))]
 [JsonSerializable(typeof(List<CrossRepoSearchEdgeApiResponse>))]
+[JsonSerializable(typeof(List<CrossRepoLinkApiResponse>))]
+[JsonSerializable(typeof(CrossRefSummaryApiResponse))]
 internal partial class AppJsonContext : JsonSerializerContext { }
