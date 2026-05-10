@@ -4,8 +4,13 @@ import { GraphCanvas } from './GraphCanvas'
 
 type DisplayMode = 'list' | 'graph'
 
-const DEPTHS = [0, 1, 2, 3] as const
-type Depth = typeof DEPTHS[number]
+const DEPTHS = [
+  { value: 0, label: 'Directo' },
+  { value: 1, label: '+1' },
+  { value: 2, label: '+2' },
+  { value: 3, label: '+3' },
+] as const
+type Depth = typeof DEPTHS[number]['value']
 
 const KIND_COLORS: Record<string, string> = {
   Class: 'text-blue-400 border-blue-800/50 bg-blue-900/20',
@@ -117,12 +122,12 @@ export function GraphView() {
         />
         <div className="flex gap-0.5 shrink-0">
           {DEPTHS.map(d => (
-            <button key={d} onClick={() => setDepth(d)} title={`BFS profundidad ${d}`}
+            <button key={d.value} onClick={() => setDepth(d.value)} title={`BFS profundidad ${d.value} — ${d.value === 0 ? 'solo el nodo exacto' : `${d.value} nivel${d.value !== 1 ? 'es' : ''} de relaciones`}`}
               className={`px-2 py-1.5 text-xs rounded font-medium transition-colors border
-                ${depth === d
+                ${depth === d.value
                   ? 'bg-gh-accent text-white border-transparent'
                   : 'bg-gh-surface text-gh-muted border-gh-border hover:text-gh-text hover:bg-gh-card'}`}
-            >{d}</button>
+            >{d.label}</button>
           ))}
         </div>
         <button onClick={() => doSearch()} disabled={loading || !query.trim()}
