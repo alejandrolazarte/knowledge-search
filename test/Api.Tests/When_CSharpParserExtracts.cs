@@ -12,14 +12,6 @@ public class When_CSharpParserExtracts : IDisposable
     public When_CSharpParserExtracts() => Directory.CreateDirectory(_temporaryDirectory);
 
     [Fact]
-    public void Then_CanParseReturnsTrueForCSharpFiles() =>
-        _sut.CanParse("MyClass.cs").ShouldBeTrue();
-
-    [Fact]
-    public void Then_CanParseReturnsFalseForNonCSharpFiles() =>
-        _sut.CanParse("index.ts").ShouldBeFalse();
-
-    [Fact]
     public void Then_ExtractsClassDeclaration()
     {
         var sourceFilePath = WriteSourceFile("MyClass.cs", """

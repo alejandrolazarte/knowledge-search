@@ -4,11 +4,6 @@ namespace KnowledgeSearch;
 
 internal sealed class TypeScriptParser : ISourceFileParser
 {
-    private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".ts", ".tsx", ".js", ".jsx", ".mjs",
-    };
-
     private static readonly HashSet<string> ControlFlowKeywords = new(StringComparer.Ordinal)
     {
         "if", "for", "while", "switch", "catch", "else", "do", "try",
@@ -43,9 +38,6 @@ internal sealed class TypeScriptParser : ISourceFileParser
     private static readonly Regex ImportFromPattern = new(
         @"^import\s+.+\bfrom\s+['""]([^'""]+)['""]",
         RegexOptions.Compiled);
-
-    public bool CanParse(string filePath) =>
-        SupportedExtensions.Contains(Path.GetExtension(filePath));
 
     public ParsedFile Parse(string filePath)
     {

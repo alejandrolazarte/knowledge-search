@@ -4,8 +4,6 @@ namespace KnowledgeSearch;
 
 internal sealed class PythonParser : ISourceFileParser
 {
-    private const string PythonFileExtension = ".py";
-
     private static readonly Regex ClassDeclarationPattern = new(
         @"^class\s+(\w+)\s*(?:\(([^)]*)\))?:",
         RegexOptions.Compiled);
@@ -21,9 +19,6 @@ internal sealed class PythonParser : ISourceFileParser
     private static readonly Regex FromImportPattern = new(
         @"^from\s+(\S+)\s+import",
         RegexOptions.Compiled);
-
-    public bool CanParse(string filePath) =>
-        Path.GetExtension(filePath).Equals(PythonFileExtension, StringComparison.OrdinalIgnoreCase);
 
     public ParsedFile Parse(string filePath)
     {

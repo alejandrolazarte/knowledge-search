@@ -11,22 +11,6 @@ public class When_TypeScriptParserExtracts : IDisposable
 
     public When_TypeScriptParserExtracts() => Directory.CreateDirectory(_temporaryDirectory);
 
-    [Theory]
-    [InlineData("service.ts")]
-    [InlineData("component.tsx")]
-    [InlineData("utils.js")]
-    [InlineData("helpers.jsx")]
-    [InlineData("module.mjs")]
-    public void Then_CanParseReturnsTrueForTypeScriptAndJavaScriptFiles(string fileName) =>
-        _sut.CanParse(fileName).ShouldBeTrue();
-
-    [Theory]
-    [InlineData("Program.cs")]
-    [InlineData("main.py")]
-    [InlineData("README.md")]
-    public void Then_CanParseReturnsFalseForNonTypeScriptFiles(string fileName) =>
-        _sut.CanParse(fileName).ShouldBeFalse();
-
     [Fact]
     public void Then_ExtractsClassDeclaration()
     {

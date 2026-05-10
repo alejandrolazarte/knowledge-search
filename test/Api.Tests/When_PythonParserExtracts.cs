@@ -12,17 +12,6 @@ public class When_PythonParserExtracts : IDisposable
     public When_PythonParserExtracts() => Directory.CreateDirectory(_temporaryDirectory);
 
     [Fact]
-    public void Then_CanParseReturnsTrueForPythonFiles() =>
-        _sut.CanParse("service.py").ShouldBeTrue();
-
-    [Theory]
-    [InlineData("Program.cs")]
-    [InlineData("index.ts")]
-    [InlineData("README.md")]
-    public void Then_CanParseReturnsFalseForNonPythonFiles(string fileName) =>
-        _sut.CanParse(fileName).ShouldBeFalse();
-
-    [Fact]
     public void Then_ExtractsClassDeclaration()
     {
         var sourceFilePath = WriteSourceFile("service.py", """
