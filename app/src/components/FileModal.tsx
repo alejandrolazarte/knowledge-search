@@ -4,9 +4,38 @@ import { MarkdownContent } from './MarkdownContent'
 interface Props {
   path: string | null
   onClose: () => void
+  endpoint?: string
 }
 
-export function FileModal({ path, onClose }: Props) {
+function languageForPath(path: string): string {
+  const extension = path.split('.').pop()?.toLowerCase()
+  switch (extension) {
+    case 'cs': return 'cs'
+    case 'ts':
+    case 'tsx': return 'ts'
+    case 'js':
+    case 'jsx':
+    case 'mjs': return 'js'
+    case 'py': return 'py'
+    case 'json': return 'json'
+    case 'xml':
+    case 'html': return 'xml'
+    case 'yml':
+    case 'yaml': return 'yaml'
+    default: return 'plaintext'
+  }
+}
+
+function shouldRenderAsMarkdown(path: string): boolean {
+  return /\.(md|mkd|markdown)$/i.test(path)
+}
+
+function renderableContent(path: string, content: string): string {
+  if (shouldRenderAsMarkdown(path)) return content
+  return `\`\`\`${languageForPath(path)}\n${content.trim()}\n\`\`\``
+}
+
+export function FileModal({ path, onClose, endpoint = '/file' }: Props) {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [copied,  setCopied]  = useState(false)
@@ -14,11 +43,11 @@ export function FileModal({ path, onClose }: Props) {
   useEffect(() => {
     if (!path) { setContent(''); return }
     setLoading(true)
-    fetch(`/file?path=${encodeURIComponent(path)}`)
+    fetch(`${endpoint}?path=${encodeURIComponent(path)}`)
       .then(r => r.text())
       .then(t => { setContent(t); setLoading(false) })
       .catch(() => { setContent('Error al cargar el archivo.'); setLoading(false) })
-  }, [path])
+  }, [endpoint, path])
 
   useEffect(() => {
     if (!path) return
@@ -93,7 +122,7 @@ export function FileModal({ path, onClose }: Props) {
                 prose-blockquote:border-gh-border prose-blockquote:text-gh-muted
                 prose-hr:border-gh-border"
                 docPath={path ?? undefined}>
-                {content}
+                {renderableContent(path, content)}
               </MarkdownContent>
           }
         </div>

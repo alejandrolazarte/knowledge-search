@@ -53,3 +53,14 @@ export interface CrossRepoSubgraphResponse {
   depth:          number
   totalFound:     number
 }
+
+export interface CodeDocumentSearchResult {
+  repositoryName: string
+  identifier:     string
+  name:           string
+  kind:           string
+  filePath:       string
+  line:           number
+  content:        string
+  score:          number
+}

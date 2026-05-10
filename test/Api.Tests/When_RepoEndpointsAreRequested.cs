@@ -199,6 +199,64 @@ public class When_RepoEndpointsAreRequested : IDisposable
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Then_GetCodeSearchReturnsRankedCodeDocuments()
+    {
+        _mockRepository
+            .Setup(r => r.SearchCodeDocuments(
+                "ImportantToken",
+                10,
+                SearchMode.Default,
+                It.Is<IReadOnlyList<string>?>(repos => repos != null && repos.Contains("repo-alpha")),
+                It.Is<IReadOnlyList<CodeNodeKind>?>(kinds => kinds != null && kinds.Contains(CodeNodeKind.Class))))
+            .Returns([
+                new CodeDocumentSearchResult(
+                    "repo-alpha",
+                    "MyApp.UserService",
+                    "UserService",
+                    CodeNodeKind.Class,
+                    "/src/UserService.cs",
+                    3,
+                    "public class UserService { string token = \"ImportantToken\"; }",
+                    -4.2),
+            ]);
+
+        var response = await _client.GetAsync("/repos/code-search?q=ImportantToken&repos=repo-alpha&kinds=Class");
+        var body = await response.Content.ReadFromJsonAsync<List<CodeDocumentSearchApiResponse>>();
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        body.ShouldNotBeNull();
+        body.ShouldHaveSingleItem();
+        body[0].RepositoryName.ShouldBe("repo-alpha");
+        body[0].Name.ShouldBe("UserService");
+        body[0].Kind.ShouldBe("Class");
+        body[0].Content.ShouldContain("ImportantToken");
+    }
+
+    [Fact]
+    public async Task Then_GetCodeSearchReturnsBadRequestWhenQueryIsEmpty()
+    {
+        var response = await _client.GetAsync("/repos/code-search?q=");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Then_GetCodeSearchReturnsBadRequestWhenModesAreInvalid()
+    {
+        var response = await _client.GetAsync("/repos/code-search?q=Service&modes=wat");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Then_GetCodeSearchReturnsBadRequestWhenKindsAreInvalid()
+    {
+        var response = await _client.GetAsync("/repos/code-search?q=Service&kinds=Controller");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
     public void Dispose()
     {
         _client.Dispose();

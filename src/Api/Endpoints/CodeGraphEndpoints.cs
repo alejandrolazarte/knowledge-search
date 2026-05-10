@@ -51,6 +51,86 @@ internal static class CodeGraphEndpoints
             return Results.Ok(new CrossRefSummaryApiResponse(crossRepoEdges.Count));
         });
 
+        app.MapGet("/repos/code-search", (
+            string? q,
+            int? limit,
+            string? modes,
+            string? repos,
+            string? kinds,
+            ICodeGraphRepository repository) =>
+        {
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                return Results.BadRequest(new ErrorResult("El parámetro q es requerido."));
+            }
+
+            SearchMode searchModes;
+            try
+            {
+                searchModes = modes is not null
+                    ? Enum.Parse<SearchMode>(modes, ignoreCase: true)
+                    : SearchMode.Default;
+            }
+            catch (ArgumentException)
+            {
+                return Results.BadRequest(new ErrorResult($"modes inválido: '{modes}'. Valores válidos: phrase, and, or"));
+            }
+
+            IReadOnlyList<CodeNodeKind>? kindFilters;
+            try
+            {
+                kindFilters = kinds?
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(kind => Enum.Parse<CodeNodeKind>(kind, ignoreCase: true))
+                    .ToList();
+            }
+            catch (ArgumentException)
+            {
+                return Results.BadRequest(new ErrorResult($"kinds inválido: '{kinds}'. Valores válidos: Class, Interface, Record, Enum, Method"));
+            }
+
+            var repoFilters = repos?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            try
+            {
+                var results = repository.SearchCodeDocuments(
+                    q,
+                    Math.Clamp(limit ?? 10, 1, 100),
+                    searchModes,
+                    repoFilters,
+                    kindFilters);
+
+                return Results.Ok(results.Select(CodeDocumentSearchApiResponse.From).ToList());
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex)
+            {
+                return Results.BadRequest(new ErrorResult($"Query inválida: {ex.Message}"));
+            }
+        });
+
+        app.MapGet("/repos/file", (string path, ICodeGraphRepository repository) =>
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return Results.BadRequest(new ErrorResult("Falta parámetro path"));
+            }
+
+            var fullPath = Path.GetFullPath(path);
+            if (!repository.IsCodePathAllowed(fullPath))
+            {
+                return Results.BadRequest(new ErrorResult("Ruta fuera de los repos escaneados"));
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                return Results.NotFound();
+            }
+
+            return Results.Text(File.ReadAllText(fullPath), "text/plain; charset=utf-8");
+        });
+
         app.MapGet("/repos/search", (string? q, int? depth, ICodeGraphRepository repository, ICodeGraphService graphService) =>
         {
             if (string.IsNullOrWhiteSpace(q))

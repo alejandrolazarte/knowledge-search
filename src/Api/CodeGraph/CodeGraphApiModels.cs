@@ -92,3 +92,25 @@ internal record CrossRepoLinkApiResponse(
 }
 
 internal record CrossRefSummaryApiResponse(int CrossRepoEdgesFound);
+
+internal record CodeDocumentSearchApiResponse(
+    string RepositoryName,
+    string Identifier,
+    string Name,
+    string Kind,
+    string FilePath,
+    int Line,
+    string Content,
+    double Score)
+{
+    internal static CodeDocumentSearchApiResponse From(CodeDocumentSearchResult result) =>
+        new(
+            result.RepositoryName,
+            result.Identifier,
+            result.Name,
+            result.Kind.ToString(),
+            result.FilePath,
+            result.Line,
+            result.Content,
+            result.Score);
+}

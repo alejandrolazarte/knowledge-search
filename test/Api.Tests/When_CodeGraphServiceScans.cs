@@ -125,6 +125,29 @@ public class When_CodeGraphServiceScans : IDisposable
             .Identifier.ShouldBe("MyApp.ConfigureServices");
     }
 
+    [Fact]
+    public void Then_ScanIndexesSearchableCodeDocuments()
+    {
+        WriteSourceFile("UserService.cs", """
+            namespace MyApp;
+            public class UserService
+            {
+                public void Handle()
+                {
+                    var marker = "ImportantToken";
+                }
+            }
+            """);
+
+        BuildService([".cs"]).ScanDirectory(_temporaryDirectory);
+
+        var result = _repository!.SearchCodeDocuments("ImportantToken", 10, SearchMode.Default, null, null);
+
+        result.ShouldHaveSingleItem();
+        result[0].Name.ShouldBe("Handle");
+        result[0].Content.ShouldContain("ImportantToken");
+    }
+
     public void Dispose()
     {
         _repository?.Dispose();
