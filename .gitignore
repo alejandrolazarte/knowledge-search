@@ -19,6 +19,8 @@ src/Api/appsettings.json
 # Frontend
 app/node_modules/
 app/dist/
+src/Api/assets/
+src/Api/index.html
 
 # Local Claude instructions (no publicar)
 CLAUDE.local.md

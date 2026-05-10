@@ -13,7 +13,7 @@ internal sealed class LogService(string logPath) : ILogService
     static readonly JsonSerializerOptions _readOpts = new()
     {
         PropertyNameCaseInsensitive = true,
-        TypeInfoResolverChain        = { AppJsonContext.Default },
+        TypeInfoResolverChain = { AppJsonContext.Default },
     };
 
     public void Append(LogEvent ev)

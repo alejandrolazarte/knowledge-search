@@ -4,31 +4,37 @@ namespace KnowledgeSearch;
 
 internal sealed class DbService : IDbService, IDisposable
 {
-    private const int SchemaVersion = 3;
+    private const int _schemaVersion = 3;
 
-    private const string InsertSql =
+    private const string _insertSql =
         "INSERT INTO docs(title,section,content,path,line) " +
         "VALUES(@title,@section,@content,@path,@line)";
 
-    private const string SearchSql =
+    private const string _searchSql =
         "SELECT title,section,path,line,content " +
         "FROM docs WHERE docs MATCH @query " +
         "ORDER BY bm25(docs,10,5,1) LIMIT @limit";
 
-    private const string GetStoredModifiedAtSql =
+    private const string _getStoredModifiedAtSql =
         "SELECT last_modified FROM docs_meta WHERE path=@path";
 
-    private const string UpsertMetaSql =
+    private const string _upsertMetaSql =
         "INSERT INTO docs_meta(path,last_modified) VALUES(@path,@modifiedAt) " +
         "ON CONFLICT(path) DO UPDATE SET last_modified=excluded.last_modified";
 
     private readonly SqliteConnection _connection;
     private readonly IReadOnlyList<string> _roots;
+    private readonly Dictionary<string, string> _rootLabels;
     private readonly object _connectionLock = new();
 
     public DbService(string dbPath, IReadOnlyList<string> roots)
     {
-        _roots = roots;
+        _roots = roots
+            .Select(Path.GetFullPath)
+            .Select(root => root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        _rootLabels = BuildRootLabels(_roots);
         _connection = new SqliteConnection($"Data Source={dbPath}");
         _connection.Open();
         ApplyPragmas();
@@ -47,17 +53,46 @@ internal sealed class DbService : IDbService, IDisposable
         lock (_connectionLock)
         {
             var ftsQuery = BuildFtsQuery(query, modes);
-            var rawResults = new List<SearchResult>();
+            var rootFilters = roots is null || roots.Count == 0
+                ? []
+                : _roots
+                    .Where(root => roots.Contains(_rootLabels[root], StringComparer.OrdinalIgnoreCase))
+                    .ToArray();
 
-            using var command = new SqliteCommand(SearchSql, _connection);
+            if (roots is not null && roots.Count > 0 && rootFilters.Length == 0)
+            {
+                return [];
+            }
+
+            var sql = _searchSql;
+            if (rootFilters.Length > 0)
+            {
+                var rootPredicates = rootFilters
+                    .Select((_, index) => $"path LIKE @root{index} ESCAPE '\\'")
+                    .ToArray();
+                sql = _searchSql.Replace(
+                    "WHERE docs MATCH @query",
+                    $"WHERE docs MATCH @query AND ({string.Join(" OR ", rootPredicates)})");
+            }
+
+            var results = new List<SearchResult>();
+
+            using var command = new SqliteCommand(sql, _connection);
             command.Parameters.AddWithValue("@query", ftsQuery);
             command.Parameters.AddWithValue("@limit", limit);
+            for (var i = 0; i < rootFilters.Length; i++)
+            {
+                var prefix = rootFilters[i]
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                command.Parameters.AddWithValue($"@root{i}", EscapeLike(prefix) + "%");
+            }
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
                 var path = reader.GetString(2);
-                rawResults.Add(new SearchResult(
+                results.Add(new SearchResult(
                     reader.GetString(0),
                     reader.GetString(1),
                     path,
@@ -66,14 +101,7 @@ internal sealed class DbService : IDbService, IDisposable
                     GetRoot(path)));
             }
 
-            if (roots is null || roots.Count == 0)
-            {
-                return rawResults;
-            }
-
-            return rawResults
-                .Where(result => roots.Contains(result.Root, StringComparer.OrdinalIgnoreCase))
-                .ToList();
+            return results;
         }
     }
 
@@ -90,7 +118,7 @@ internal sealed class DbService : IDbService, IDisposable
                 {
                     try
                     {
-                        return Directory.EnumerateFiles(root, "*.md",  SearchOption.AllDirectories)
+                        return Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
                             .Concat(Directory.EnumerateFiles(root, "*.mkd", SearchOption.AllDirectories));
                     }
                     catch (DirectoryNotFoundException)
@@ -149,7 +177,7 @@ internal sealed class DbService : IDbService, IDisposable
             {
                 var modifiedAt = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeSeconds();
                 long? stored;
-                using (var command = new SqliteCommand(GetStoredModifiedAtSql, _connection))
+                using (var command = new SqliteCommand(_getStoredModifiedAtSql, _connection))
                 {
                     command.Parameters.AddWithValue("@path", file);
                     var result = command.ExecuteScalar();
@@ -172,7 +200,7 @@ internal sealed class DbService : IDbService, IDisposable
 
                     IndexFileSections(file, Path.GetFileNameWithoutExtension(file), transaction);
 
-                    using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
+                    using (var metaCmd = new SqliteCommand(_upsertMetaSql, _connection, transaction))
                     {
                         metaCmd.Parameters.AddWithValue("@path", file);
                         metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
@@ -237,7 +265,7 @@ internal sealed class DbService : IDbService, IDisposable
 
                 IndexFileSections(path, Path.GetFileNameWithoutExtension(path), transaction);
 
-                using (var metaCmd = new SqliteCommand(UpsertMetaSql, _connection, transaction))
+                using (var metaCmd = new SqliteCommand(_upsertMetaSql, _connection, transaction))
                 {
                     metaCmd.Parameters.AddWithValue("@path", path);
                     metaCmd.Parameters.AddWithValue("@modifiedAt", modifiedAt);
@@ -289,7 +317,7 @@ internal sealed class DbService : IDbService, IDisposable
     {
         lock (_connectionLock)
         {
-            return _roots.Select(root => Path.GetFileName(root)!).ToList();
+            return _roots.Select(root => _rootLabels[root]).ToList();
         }
     }
 
@@ -346,12 +374,60 @@ internal sealed class DbService : IDbService, IDisposable
                 + Path.DirectorySeparatorChar;
             if (path.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
             {
-                return Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))!;
+                return _rootLabels[root];
             }
         }
 
         return string.Empty;
     }
+
+    private static Dictionary<string, string> BuildRootLabels(IReadOnlyList<string> roots)
+    {
+        var normalizedRoots = roots
+            .Select(root => root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .ToArray();
+
+        var labels = normalizedRoots.ToDictionary(root => root, root => Path.GetFileName(root)!);
+        var duplicateLabels = labels.Values
+            .GroupBy(label => label, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (duplicateLabels.Count == 0)
+        {
+            return labels;
+        }
+
+        foreach (var root in normalizedRoots.Where(root => duplicateLabels.Contains(labels[root])))
+        {
+            var parts = root.Split(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                StringSplitOptions.RemoveEmptyEntries);
+            labels[root] = parts.Length >= 2
+                ? string.Join("/", parts.TakeLast(2))
+                : root;
+        }
+
+        var stillDuplicateLabels = labels.Values
+            .GroupBy(label => label, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var root in normalizedRoots.Where(root => stillDuplicateLabels.Contains(labels[root])))
+        {
+            labels[root] = root.Replace(Path.DirectorySeparatorChar, '/');
+        }
+
+        return labels;
+    }
+
+    private static string EscapeLike(string value) =>
+        value
+            .Replace(@"\", @"\\")
+            .Replace("%", @"\%")
+            .Replace("_", @"\_");
 
     private void IndexFileSections(string path, string title, SqliteTransaction transaction)
     {
@@ -372,12 +448,12 @@ internal sealed class DbService : IDbService, IDisposable
                 return;
             }
 
-            using var command = new SqliteCommand(InsertSql, _connection, transaction);
-            command.Parameters.AddWithValue("@title",   title);
+            using var command = new SqliteCommand(_insertSql, _connection, transaction);
+            command.Parameters.AddWithValue("@title", title);
             command.Parameters.AddWithValue("@section", section);
             command.Parameters.AddWithValue("@content", string.Join("\n", buffer).Trim());
-            command.Parameters.AddWithValue("@path",    path);
-            command.Parameters.AddWithValue("@line",    startLine);
+            command.Parameters.AddWithValue("@path", path);
+            command.Parameters.AddWithValue("@line", startLine);
             command.ExecuteNonQuery();
             buffer.Clear();
         }
@@ -388,7 +464,7 @@ internal sealed class DbService : IDbService, IDisposable
             {
                 Flush();
                 startLine = i + 1;
-                section   = lines[i].TrimStart('#').Trim();
+                section = lines[i].TrimStart('#').Trim();
             }
 
             buffer.Add(lines[i]);
@@ -409,7 +485,7 @@ internal sealed class DbService : IDbService, IDisposable
         ExecuteSql("CREATE TABLE IF NOT EXISTS schema_info(version INTEGER NOT NULL)");
         var version = QuerySchemaVersion();
 
-        if (version == SchemaVersion)
+        if (version == _schemaVersion)
         {
             return;
         }
@@ -426,11 +502,11 @@ internal sealed class DbService : IDbService, IDisposable
 
         if (version is null)
         {
-            ExecuteSql($"INSERT INTO schema_info(version) VALUES({SchemaVersion})");
+            ExecuteSql($"INSERT INTO schema_info(version) VALUES({_schemaVersion})");
         }
         else
         {
-            ExecuteSql($"UPDATE schema_info SET version={SchemaVersion}");
+            ExecuteSql($"UPDATE schema_info SET version={_schemaVersion}");
         }
     }
 

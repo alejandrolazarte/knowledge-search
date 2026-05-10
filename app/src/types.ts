@@ -15,6 +15,6 @@ export interface Skill {
 
 export interface LogEvent {
   ts:   string
-  type: 'added' | 'updated' | 'deleted'
+  type: 'added' | 'updated' | 'deleted' | 'error'
   path: string
 }

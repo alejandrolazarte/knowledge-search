@@ -21,10 +21,10 @@ internal static class StaticEndpoints
             }
             var mime = Path.GetExtension(filePath).ToLowerInvariant() switch
             {
-                ".js"  => "application/javascript",
+                ".js" => "application/javascript",
                 ".css" => "text/css",
                 ".map" => "application/json",
-                _      => "application/octet-stream"
+                _ => "application/octet-stream"
             };
             return Results.Text(File.ReadAllText(filePath), mime);
         });

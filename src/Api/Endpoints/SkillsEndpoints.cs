@@ -11,7 +11,7 @@ internal static class SkillsEndpoints
             {
                 foreach (var dir in Directory.GetDirectories(skillsDir).OrderBy(Path.GetFileName))
                 {
-                    var file   = Path.Combine(dir, "SKILL.md");
+                    var file = Path.Combine(dir, "SKILL.md");
                     var exists = File.Exists(file);
                     string detail = exists ? "OK" : "NO SKILL.md";
                     if (exists)
@@ -52,7 +52,7 @@ internal static class SkillsEndpoints
                     {
                         continue;
                     }
-                    var content      = File.ReadAllText(file);
+                    var content = File.ReadAllText(file);
                     var (name, desc) = ParseFrontmatter(content);
                     if (string.IsNullOrEmpty(name))
                     {

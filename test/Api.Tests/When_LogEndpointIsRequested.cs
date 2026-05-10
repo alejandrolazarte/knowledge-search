@@ -12,7 +12,7 @@ namespace Api.Tests;
 public class When_LogEndpointIsRequested : IDisposable
 {
     private readonly Mock<ILogService> _mockLog = new();
-    private readonly Mock<IDbService>  _mockDb  = new();
+    private readonly Mock<IDbService> _mockDb = new();
     private readonly WebApplicationFactory<Program> _factory;
     private readonly HttpClient _client;
 
@@ -48,7 +48,7 @@ public class When_LogEndpointIsRequested : IDisposable
         _mockLog.Setup(l => l.ReadLast(100)).Returns(events);
 
         var response = await _client.GetAsync("/log");
-        var result   = await response.Content.ReadFromJsonAsync<List<LogEvent>>();
+        var result = await response.Content.ReadFromJsonAsync<List<LogEvent>>();
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         result.ShouldNotBeNull();

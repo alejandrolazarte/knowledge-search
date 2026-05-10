@@ -90,13 +90,13 @@ internal static class SearchEndpoints
 
             var contentType = Path.GetExtension(fullPath).ToLowerInvariant() switch
             {
-                ".png"  => "image/png",
-                ".jpg"  => "image/jpeg",
+                ".png" => "image/png",
+                ".jpg" => "image/jpeg",
                 ".jpeg" => "image/jpeg",
-                ".gif"  => "image/gif",
-                ".svg"  => "image/svg+xml",
+                ".gif" => "image/gif",
+                ".svg" => "image/svg+xml",
                 ".webp" => "image/webp",
-                _       => "application/octet-stream",
+                _ => "application/octet-stream",
             };
 
             return Results.File(File.ReadAllBytes(fullPath), contentType);

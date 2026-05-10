@@ -31,10 +31,10 @@ internal sealed class WatcherService(
     {
         var watcher = new FileSystemWatcher(root)
         {
-            Filter                = "*",
+            Filter = "*",
             IncludeSubdirectories = true,
-            EnableRaisingEvents   = true,
-            NotifyFilter          = NotifyFilters.LastWrite | NotifyFilters.FileName,
+            EnableRaisingEvents = true,
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
         };
 
         watcher.Changed += (_, e) => { if (IsMd(e.FullPath)) { Debounce(e.FullPath, "updated"); } };
@@ -60,7 +60,7 @@ internal sealed class WatcherService(
     }
 
     private static bool IsMd(string path) =>
-        path.EndsWith(".md",  StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(".mkd", StringComparison.OrdinalIgnoreCase);
 
     private void Debounce(string path, string eventType)
@@ -72,7 +72,27 @@ internal sealed class WatcherService(
                 existing.Dispose();
             }
 
-            _debounce[path] = new Timer(_ => ProcessChange(path, eventType), null, 500, Timeout.Infinite);
+            Timer? timer = null;
+            timer = new Timer(_ =>
+            {
+                try
+                {
+                    ProcessChange(path, eventType);
+                }
+                finally
+                {
+                    lock (_debounceLock)
+                    {
+                        if (_debounce.TryGetValue(path, out var current) && ReferenceEquals(current, timer))
+                        {
+                            _debounce.Remove(path);
+                            current.Dispose();
+                        }
+                    }
+                }
+            }, null, 500, Timeout.Infinite);
+
+            _debounce[path] = timer;
         }
     }
 
