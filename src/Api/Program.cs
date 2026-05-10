@@ -38,6 +38,7 @@ builder.Services.AddSingleton<ILogService>(new LogService(logPath));
 builder.Services.AddHostedService(serviceProvider =>
     new WatcherService(roots, serviceProvider.GetRequiredService<IDbService>(), serviceProvider.GetRequiredService<ILogService>()));
 
+builder.Services.AddSingleton<ICodeGraphRepository>(_ => new CodeGraphRepository(dbPath));
 builder.Services.AddKeyedSingleton<ISourceFileParser, CSharpParser>(".cs");
 foreach (var typeScriptExtension in new[] { ".ts", ".tsx", ".js", ".jsx", ".mjs" })
 {

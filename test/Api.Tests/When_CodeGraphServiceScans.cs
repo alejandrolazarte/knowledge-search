@@ -8,6 +8,7 @@ namespace Api.Tests;
 public class When_CodeGraphServiceScans : IDisposable
 {
     private readonly string _temporaryDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+    private readonly string _dbPath = Path.GetTempFileName();
 
     public When_CodeGraphServiceScans() => Directory.CreateDirectory(_temporaryDirectory);
 
@@ -106,12 +107,13 @@ public class When_CodeGraphServiceScans : IDisposable
     public void Dispose()
     {
         Directory.Delete(_temporaryDirectory, recursive: true);
+        File.Delete(_dbPath);
         GC.SuppressFinalize(this);
     }
 
     private static readonly string[] TypeScriptExtensions = [".ts", ".tsx", ".js", ".jsx", ".mjs"];
 
-    private static CodeGraphService BuildService(IReadOnlyList<string> extensions)
+    private CodeGraphService BuildService(IReadOnlyList<string> extensions)
     {
         var services = new ServiceCollection();
 
@@ -130,7 +132,8 @@ public class When_CodeGraphServiceScans : IDisposable
             services.AddKeyedSingleton<ISourceFileParser, PythonParser>(".py");
         }
 
-        return new CodeGraphService(services.BuildServiceProvider());
+        var repository = new CodeGraphRepository(_dbPath);
+        return new CodeGraphService(services.BuildServiceProvider(), repository);
     }
 
     private void WriteSourceFile(string relativePath, string sourceCode)

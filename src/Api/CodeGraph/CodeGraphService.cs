@@ -2,11 +2,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace KnowledgeSearch;
 
-internal sealed class CodeGraphService(IServiceProvider serviceProvider) : ICodeGraphService
+internal sealed class CodeGraphService(
+    IServiceProvider serviceProvider,
+    ICodeGraphRepository repository) : ICodeGraphService
 {
     private readonly IKeyedServiceProvider _keyedServiceProvider = (IKeyedServiceProvider)serviceProvider;
 
-    private static readonly IReadOnlySet<string> ExcludedDirectoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> ExcludedDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "node_modules", ".git", "bin", "obj",
     };
@@ -35,7 +37,11 @@ internal sealed class CodeGraphService(IServiceProvider serviceProvider) : ICode
             filesScanned++;
         }
 
-        return new CodeGraphScanResult(allNodes, allEdges, filesScanned, filesSkipped);
+        var scanResult = new CodeGraphScanResult(allNodes, allEdges, filesScanned, filesSkipped);
+        var repositoryName = Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        repository.SaveScanResult(repositoryName, scanResult);
+
+        return scanResult;
     }
 
     private static IEnumerable<string> EnumerateSourceFiles(string directoryPath) =>
