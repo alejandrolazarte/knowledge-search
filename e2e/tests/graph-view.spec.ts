@@ -23,8 +23,8 @@ test.describe('Code Graph — vista lista', () => {
 
   test('muestra el panel de búsqueda y los controles de profundidad', async ({ page }) => {
     await expect(page.getByPlaceholder(/Buscar en repos/i)).toBeVisible()
-    await expect(page.getByRole('button', { name: '0' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '2' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Directo' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '+2' })).toBeVisible()
   })
 
   test('escanea users-ms y muestra el repo en los chips', async ({ page }) => {
