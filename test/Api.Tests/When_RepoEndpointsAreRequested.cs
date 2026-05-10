@@ -162,6 +162,42 @@ public class When_RepoEndpointsAreRequested : IDisposable
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Then_GetGlobalSearchReturnsNodesFromAllRepositories()
+    {
+        var eventNode = new CodeNode("Users.Event", "UserCreatedIntegrationEvent", CodeNodeKind.Class, "/users/Event.cs", 1);
+        var handlerNode = new CodeNode("Notif.Handler", "UserCreatedIntegrationEventHandler", CodeNodeKind.Class, "/notif/Handler.cs", 1);
+        var crossRepoResult = new CrossRepoSubgraphResult(
+            [
+                new RepositoryBoundCodeNode("users-ms", eventNode),
+                new RepositoryBoundCodeNode("notifications-ms", handlerNode),
+            ],
+            [],
+            new Dictionary<string, int>(),
+            TotalFound: 2);
+
+        _mockService.Setup(s => s.SearchSubgraphAcrossRepositories("IntegrationEvent", 2)).Returns(crossRepoResult);
+
+        var response = await _client.GetAsync("/repos/search?q=IntegrationEvent&depth=2");
+        var body = await response.Content.ReadFromJsonAsync<CrossRepoSubgraphApiResponse>();
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        body.ShouldNotBeNull();
+        body.Nodes.Count.ShouldBe(2);
+        body.Nodes.ShouldContain(n => n.RepositoryName == "users-ms" && n.Name == "UserCreatedIntegrationEvent");
+        body.Nodes.ShouldContain(n => n.RepositoryName == "notifications-ms" && n.Name == "UserCreatedIntegrationEventHandler");
+        body.Query.ShouldBe("IntegrationEvent");
+        body.TotalFound.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Then_GetGlobalSearchReturnsBadRequestWhenQueryIsEmpty()
+    {
+        var response = await _client.GetAsync("/repos/search?q=");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
     public void Dispose()
     {
         _client.Dispose();

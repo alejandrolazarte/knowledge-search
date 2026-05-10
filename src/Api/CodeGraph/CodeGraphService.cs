@@ -100,6 +100,40 @@ internal sealed class CodeGraphService(
         return new CodeSubgraphResult(resultNodes, resultEdges, nodeWeights, seedNodes.Count);
     }
 
+    public CrossRepoSubgraphResult SearchSubgraphAcrossRepositories(string query, int depth)
+    {
+        var allRepositoryNames = repository.GetRepositoryNames();
+        var resultNodes = new List<RepositoryBoundCodeNode>();
+        var resultEdges = new List<RepositoryBoundCodeEdge>();
+        var totalFound = 0;
+
+        foreach (var repositoryName in allRepositoryNames)
+        {
+            var subgraph = SearchSubgraph(repositoryName, query, depth);
+            if (subgraph.TotalFound == 0)
+            {
+                continue;
+            }
+
+            totalFound += subgraph.TotalFound;
+            resultNodes.AddRange(subgraph.Nodes.Select(n => new RepositoryBoundCodeNode(repositoryName, n)));
+            resultEdges.AddRange(subgraph.Edges.Select(e => new RepositoryBoundCodeEdge(repositoryName, e)));
+        }
+
+        var nodeWeights = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var boundEdge in resultEdges)
+        {
+            var sourceKey = $"{boundEdge.RepositoryName}:{boundEdge.Edge.SourceIdentifier}";
+            var targetKey = $"{boundEdge.RepositoryName}:{boundEdge.Edge.TargetIdentifier}";
+            nodeWeights.TryGetValue(sourceKey, out var sourceWeight);
+            nodeWeights[sourceKey] = sourceWeight + 1;
+            nodeWeights.TryGetValue(targetKey, out var targetWeight);
+            nodeWeights[targetKey] = targetWeight + 1;
+        }
+
+        return new CrossRepoSubgraphResult(resultNodes, resultEdges, nodeWeights, totalFound);
+    }
+
     private static Dictionary<string, HashSet<string>> BuildBidirectionalAdjacency(IReadOnlyList<CodeEdge> edges)
     {
         var adjacency = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);

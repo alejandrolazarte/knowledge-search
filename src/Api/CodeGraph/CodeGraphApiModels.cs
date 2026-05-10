@@ -37,3 +37,44 @@ internal record CodeSubgraphApiResponse(
     string Query,
     int Depth,
     int TotalFound);
+
+internal record CrossRepoSearchNodeApiResponse(
+    string RepositoryName,
+    string Identifier,
+    string Name,
+    string Kind,
+    string FilePath,
+    int Line,
+    int Weight)
+{
+    internal static CrossRepoSearchNodeApiResponse From(RepositoryBoundCodeNode boundNode, int weight) =>
+        new(boundNode.RepositoryName,
+            boundNode.Node.Identifier,
+            boundNode.Node.Name,
+            boundNode.Node.Kind.ToString(),
+            boundNode.Node.FilePath,
+            boundNode.Node.Line,
+            weight);
+}
+
+internal record CrossRepoSearchEdgeApiResponse(
+    string RepositoryName,
+    string SourceIdentifier,
+    string TargetIdentifier,
+    string Kind,
+    int Line)
+{
+    internal static CrossRepoSearchEdgeApiResponse From(RepositoryBoundCodeEdge boundEdge) =>
+        new(boundEdge.RepositoryName,
+            boundEdge.Edge.SourceIdentifier,
+            boundEdge.Edge.TargetIdentifier,
+            boundEdge.Edge.Kind.ToString(),
+            boundEdge.Edge.Line);
+}
+
+internal record CrossRepoSubgraphApiResponse(
+    IReadOnlyList<CrossRepoSearchNodeApiResponse> Nodes,
+    IReadOnlyList<CrossRepoSearchEdgeApiResponse> Edges,
+    string Query,
+    int Depth,
+    int TotalFound);

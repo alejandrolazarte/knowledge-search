@@ -45,6 +45,29 @@ internal static class CodeGraphEndpoints
                 scanResult.Edges.Count));
         });
 
+        app.MapGet("/repos/search", (string? q, int? depth, ICodeGraphService graphService) =>
+        {
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                return Results.BadRequest(new ErrorResult("El parámetro q es requerido."));
+            }
+
+            var actualDepth = Math.Clamp(depth ?? 2, 0, 5);
+            var subgraph = graphService.SearchSubgraphAcrossRepositories(q, actualDepth);
+            var weightKey = (RepositoryBoundCodeNode n) => $"{n.RepositoryName}:{n.Node.Identifier}";
+
+            var response = new CrossRepoSubgraphApiResponse(
+                subgraph.Nodes
+                    .Select(n => CrossRepoSearchNodeApiResponse.From(n, subgraph.NodeWeights.GetValueOrDefault(weightKey(n))))
+                    .ToList(),
+                subgraph.Edges.Select(CrossRepoSearchEdgeApiResponse.From).ToList(),
+                q,
+                actualDepth,
+                subgraph.TotalFound);
+
+            return Results.Ok(response);
+        });
+
         app.MapGet("/repos/{name}/search", (string name, string? q, int? depth, ICodeGraphRepository repository, ICodeGraphService graphService) =>
         {
             if (string.IsNullOrWhiteSpace(q))
