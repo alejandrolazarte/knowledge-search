@@ -212,7 +212,11 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
 
     private void InsertNodes(string repositoryName, IReadOnlyList<CodeNode> nodes, SqliteTransaction transaction)
     {
-        foreach (var node in nodes)
+        var uniqueNodes = nodes
+            .GroupBy(n => n.Identifier, StringComparer.Ordinal)
+            .Select(g => g.First());
+
+        foreach (var node in uniqueNodes)
         {
             using var command = new SqliteCommand(InsertNodeSql, _connection, transaction);
             command.Parameters.AddWithValue("@repoName", repositoryName);
