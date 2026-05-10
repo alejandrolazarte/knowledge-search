@@ -17,10 +17,11 @@ export default defineConfig({
     trace:      'on-first-retry',
   },
   webServer: {
-    command:             'dotnet run --environment E2E',
+    command:             'dotnet run',
     cwd:                 path.join(__dirname, '..', 'src', 'Api'),
     url:                 'http://localhost:5111',
     timeout:             90_000,
     reuseExistingServer: !process.env.CI,
+    env:                 { ASPNETCORE_ENVIRONMENT: 'E2E' },
   },
 })

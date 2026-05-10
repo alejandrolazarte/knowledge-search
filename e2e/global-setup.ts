@@ -7,8 +7,13 @@ export default async function globalSetup() {
   const shmPath    = testDbPath + '-shm'
 
   for (const filePath of [testDbPath, walPath, shmPath]) {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath)
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+      }
+    } catch {
+      // File may be locked by a previous run — ignore and continue
+      console.warn(`Could not delete ${filePath}, continuing anyway`)
     }
   }
 }

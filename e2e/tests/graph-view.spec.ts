@@ -74,7 +74,7 @@ test.describe('Code Graph — vista lista', () => {
     await page.getByPlaceholder(/Buscar en repos/i).fill('XyzClaseQueNoExiste999')
     await page.keyboard.press('Enter')
 
-    await expect(page.getByText(/Sin resultados/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/Sin resultados/i).first()).toBeVisible({ timeout: 10_000 })
   })
 })
 

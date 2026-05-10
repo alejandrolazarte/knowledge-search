@@ -2,7 +2,12 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Knowledge Search', () => {
   test.beforeEach(async ({ page }) => {
+    // Escuchar el POST /index antes de navegar (se dispara en mount)
+    const indexDone = page.waitForResponse(
+      res => res.url().endsWith('/index') && res.request().method() === 'POST',
+      { timeout: 15_000 })
     await page.goto('/')
+    await indexDone
   })
 
   test('muestra el input de búsqueda al cargar', async ({ page }) => {
@@ -21,7 +26,7 @@ test.describe('Knowledge Search', () => {
     await page.getByPlaceholder(/Buscar en knowledge/i).fill('UserCreatedIntegrationEvent')
     await page.keyboard.press('Enter')
 
-    await expect(page.getByText(/Integration Events/i).first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/UserCreatedIntegrationEvent/i).first()).toBeVisible({ timeout: 10_000 })
   })
 
   test('devuelve resultados para búsqueda de autenticación', async ({ page }) => {
@@ -36,7 +41,7 @@ test.describe('Knowledge Search', () => {
     await page.getByPlaceholder(/Buscar en knowledge/i).fill('xyzterminoquenoexiste999')
     await page.keyboard.press('Enter')
 
-    await expect(page.getByText(/Sin resultados/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/Sin resultados/i).first()).toBeVisible({ timeout: 10_000 })
   })
 
   test('limpia la búsqueda con Escape', async ({ page }) => {
