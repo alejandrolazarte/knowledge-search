@@ -36,7 +36,7 @@ Abre `http://localhost:5111` en el navegador.
 
 ## Documentación
 
-- [GitHub hardening](docs/github-hardening.md): configuración de protección de `main`, Pull Requests obligatorios, permisos de Actions y comandos de auditoría.
+- GitHub hardening: documentado en `D:\Documentation\Projects\knowledge-search\github-hardening.md`.
 
 ### Variables de entorno
 

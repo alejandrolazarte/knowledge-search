@@ -65,7 +65,7 @@ When documenting an operational, security, infrastructure, or external configura
 Current runbook:
 
 ```text
-docs/github-hardening.md
+D:\Documentation\Projects\knowledge-search\github-hardening.md
 ```
 
 ## Git Workflow
