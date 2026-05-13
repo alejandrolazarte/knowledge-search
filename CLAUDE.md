@@ -60,8 +60,11 @@ dotnet test
 # Levantar API (hot reload)
 cd src/Api && dotnet watch run
 
+# Instalar frontend de forma segura
+cd app && pnpm install --frozen-lockfile --ignore-scripts
+
 # Build frontend
-cd app && npm run build
+cd app && pnpm run build
 ```
 
 ## Variables de entorno

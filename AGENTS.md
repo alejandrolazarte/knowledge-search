@@ -49,7 +49,8 @@ Useful commands:
 dotnet test test\Api.Tests\Api.Tests.csproj --no-restore -v minimal
 dotnet build src\Api\Api.csproj --no-restore -v minimal
 cd app
-npm run build
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm run build
 ```
 
 ## Documentation
@@ -116,7 +117,10 @@ Expected important fields:
 - Match existing React/Tailwind style.
 - Keep tool UIs dense and usable; avoid landing-page composition.
 - Use existing shared components before creating new ones.
-- Run `npm run build` after TypeScript/frontend changes.
+- The frontend uses `pnpm`, not npm.
+- Install with `pnpm install --frozen-lockfile --ignore-scripts`.
+- Run `pnpm run build` after TypeScript/frontend changes.
+- Do not run package install commands that execute dependency lifecycle scripts unless the user explicitly approves it.
 
 ## Backend Notes
 

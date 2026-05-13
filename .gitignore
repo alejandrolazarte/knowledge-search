@@ -17,6 +17,7 @@ knowledge.db-shm
 src/Api/appsettings.json
 
 # Frontend
+node_modules/
 app/node_modules/
 app/dist/
 src/Api/assets/

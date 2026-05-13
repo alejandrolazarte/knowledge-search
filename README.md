@@ -62,16 +62,23 @@ Abre `http://localhost:5111` en el navegador.
 
 ## Desarrollo del frontend
 
+El frontend usa `pnpm` con configuración defensiva contra supply-chain attacks:
+
+- `ignore-scripts=true`: no ejecuta scripts automáticos de dependencias durante install.
+- `minimumReleaseAge: 4320`: espera 3 días antes de aceptar versiones recién publicadas.
+- `save-exact=true`: evita rangos nuevos al agregar dependencias.
+
 ```bash
 cd knowledge-search/app
-npm install
-npm run dev   # dev server en :5173, proxy a :5111
+corepack enable
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm run dev   # dev server en :5173, proxy a :5111
 ```
 
 Para generar el build de producción (emite a `Api/`):
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 **Stack:** Vite 6 · React 19 · TypeScript 5 · Tailwind 3 · react-markdown
