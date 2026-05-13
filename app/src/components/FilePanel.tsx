@@ -6,6 +6,7 @@ interface Props {
   path:     string | null
   onClose:  () => void
   endpoint?: string
+  onOpenFile?: (path: string, endpoint?: string) => void
 }
 
 function languageForPath(path: string): string {
@@ -36,7 +37,7 @@ function renderableContent(path: string, content: string): string {
   return `\`\`\`${languageForPath(path)}\n${content.trim()}\n\`\`\``
 }
 
-export function FilePanel({ path, onClose, endpoint = '/file' }: Props) {
+export function FilePanel({ path, onClose, endpoint = '/file', onOpenFile }: Props) {
   const [content,       setContent]       = useState('')
   const [originalContent, setOriginalContent] = useState('')
   const [loading,       setLoading]       = useState(false)
@@ -214,6 +215,8 @@ export function FilePanel({ path, onClose, endpoint = '/file' }: Props) {
                     prose-blockquote:border-gh-border prose-blockquote:text-gh-muted
                     prose-hr:border-gh-border"
                   docPath={path}
+                  onOpenFile={onOpenFile}
+                  fileEndpoint={endpoint}
                 >
                   {renderableContent(path, content)}
                 </MarkdownContent>

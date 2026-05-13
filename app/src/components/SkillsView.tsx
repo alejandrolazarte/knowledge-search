@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import type { Skill } from '../types'
 
 interface Props {
-  onOpen:  (skill: Skill) => void
-  active:  Skill | null
+  onOpen:      (skill: Skill) => void
+  activePath:  string | null
 }
 
-export function SkillsView({ onOpen, active }: Props) {
+export function SkillsView({ onOpen, activePath }: Props) {
   const [allSkills, setAllSkills] = useState<Skill[]>([])
   const [filter,    setFilter]    = useState('')
   const [loading,   setLoading]   = useState(true)
@@ -50,7 +50,7 @@ export function SkillsView({ onOpen, active }: Props) {
               key={s.dirName}
               onClick={() => onOpen(s)}
               className={`text-left p-3 rounded-lg border transition-colors
-                ${active?.dirName === s.dirName
+                ${activePath === s.filePath
                   ? 'border-gh-accent bg-gh-card'
                   : 'border-gh-border bg-gh-surface hover:bg-gh-card'}`}
             >

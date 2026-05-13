@@ -71,9 +71,11 @@ interface Props {
   className?: string
   highlight?: string
   docPath?: string
+  onOpenFile?: (path: string, endpoint?: string) => void
+  fileEndpoint?: string
 }
 
-export function MarkdownContent({ children, className, highlight, docPath }: Props) {
+export function MarkdownContent({ children, className, highlight, docPath, onOpenFile, fileEndpoint = '/file' }: Props) {
   const hlWords = highlight
     ? highlight.trim().split(/\s+/).filter(w => w.length >= 2)
     : []
@@ -84,10 +86,47 @@ export function MarkdownContent({ children, className, highlight, docPath }: Pro
     ? docPath.replace(/\\/g, '/').replace(/\/[^/]+$/, '')
     : null
 
+  function normalizePath(path: string): string {
+    const parts: string[] = []
+    path.replace(/\\/g, '/').split('/').forEach(part => {
+      if (!part || part === '.') { return }
+      if (part === '..') {
+        const last = parts[parts.length - 1]
+        if (parts.length > 0 && last && !last.endsWith(':')) { parts.pop() }
+        return
+      }
+      parts.push(part)
+    })
+    return parts.join('\\')
+  }
+
   function resolveImageSrc(src: string): string {
     if (!docDir || /^(https?:\/\/|data:)/i.test(src)) return src
     const fullPath = `${docDir}/${src}`.replace(/\//g, '\\')
     return `/image?path=${encodeURIComponent(fullPath)}`
+  }
+
+  function resolveFileHref(href: string): string | null {
+    if (!href || href.startsWith('#') || /^(https?:\/\/|mailto:|tel:|data:)/i.test(href)) {
+      return null
+    }
+    if (/^\/(file|image|skill-file)\?/i.test(href)) {
+      return null
+    }
+
+    const pathOnly = href.split('#')[0].split('?')[0]
+    if (!pathOnly) { return null }
+
+    let decoded = pathOnly
+    try { decoded = decodeURIComponent(pathOnly) } catch { /* keep the original href */ }
+
+    if (/^[A-Za-z]:[\\/]/.test(decoded) || decoded.startsWith('\\\\')) {
+      return normalizePath(decoded)
+    }
+    if (!docDir || decoded.startsWith('/')) {
+      return null
+    }
+    return normalizePath(`${docDir}/${decoded}`)
   }
 
   return (
@@ -95,6 +134,27 @@ export function MarkdownContent({ children, className, highlight, docPath }: Pro
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          a({ href, children: linkChildren, ...props }) {
+            const resolved = href ? resolveFileHref(href) : null
+            if (resolved && onOpenFile) {
+              return (
+                <a
+                  href={href}
+                  {...props}
+                  onClick={event => {
+                    event.preventDefault()
+                    onOpenFile(resolved, fileEndpoint)
+                  }}
+                >
+                  {linkChildren}
+                </a>
+              )
+            }
+            if (href && /^(https?:\/\/|mailto:|tel:)/i.test(href)) {
+              return <a href={href} target="_blank" rel="noreferrer" {...props}>{linkChildren}</a>
+            }
+            return <a href={href} {...props}>{linkChildren}</a>
+          },
           img({ src, alt }) {
             const resolved = src ? resolveImageSrc(src) : undefined
             return <img src={resolved} alt={alt ?? ''} style={{ maxWidth: '100%' }} />

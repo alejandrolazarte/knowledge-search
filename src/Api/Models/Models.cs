@@ -6,7 +6,7 @@ internal record SearchResult(string Title, string Section, string Path, int Line
 internal record IndexResult(int Added, int Updated, int Deleted);
 internal record HealthResult(string Status);
 internal record ErrorResult(string Error);
-internal record SkillSummary(string Name, string Description, string DirName);
+internal record SkillSummary(string Name, string Description, string DirName, string FilePath);
 
 public record LogEvent(
     [property: JsonPropertyName("ts")] string Ts,

@@ -11,6 +11,7 @@ export interface Skill {
   name:        string
   description: string
   dirName:     string
+  filePath:    string
 }
 
 export interface LogEvent {

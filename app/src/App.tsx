@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { Sidebar }    from './components/Sidebar'
 import { SearchView } from './components/SearchView'
 import { SkillsView } from './components/SkillsView'
-import { SkillPanel } from './components/SkillPanel'
 import { FilePanel }  from './components/FilePanel'
 import { GraphView }  from './components/GraphView'
 import { RepoSearchView } from './components/RepoSearchView'
@@ -21,20 +20,16 @@ export function App() {
   const { theme, setTheme }                       = useTheme()
   const { size: fontSize, setSize: setFontSize }  = useFontSize()
   const [view,        setView]                    = useState<View>('search')
-  const [activeSkill, setActiveSkill]             = useState<Skill | null>(null)
   const [activeFile,  setActiveFile]              = useState<ActiveFile | null>(null)
   const [reindexing,  setReindexing]              = useState(false)
   const [statusMsg,   setStatusMsg]               = useState('')
   const searchInputRef                            = useRef<HTMLInputElement>(null)
 
-  // Opening a file closes any skill (and vice versa) so only one right panel is active
   const openFile = (path: string, endpoint: string = '/file') => {
-    setActiveSkill(null)
     setActiveFile({ path, endpoint })
   }
-  const openSkill = (skill: Skill | null) => {
-    setActiveFile(null)
-    setActiveSkill(skill)
+  const openSkill = (skill: Skill) => {
+    openFile(skill.filePath, '/skill-file')
   }
 
   // Ctrl+K — focus search from anywhere
@@ -110,7 +105,7 @@ export function App() {
           <RepoSearchView onOpenFile={openFile} />
         )}
         {view === 'skills' && (
-          <SkillsView onOpen={openSkill} active={activeSkill} />
+          <SkillsView onOpen={openSkill} activePath={activeFile?.path ?? null} />
         )}
         {view === 'graph' && (
           <GraphView />
@@ -121,8 +116,8 @@ export function App() {
         path={activeFile?.path ?? null}
         endpoint={activeFile?.endpoint}
         onClose={() => setActiveFile(null)}
+        onOpenFile={openFile}
       />
-      <SkillPanel skill={activeSkill} onClose={() => setActiveSkill(null)} />
     </div>
   )
 }

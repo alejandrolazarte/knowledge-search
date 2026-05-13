@@ -416,7 +416,8 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef, onOpenF
                   prose-ol:my-0.5
                   prose-table:text-xs prose-th:text-gh-text prose-td:text-gh-muted prose-th:py-0.5 prose-td:py-0.5
                   prose-blockquote:border-gh-border prose-blockquote:text-gh-muted prose-blockquote:text-xs"
-                  docPath={r.path}>
+                  docPath={r.path}
+                  onOpenFile={onOpenFile}>
                   {r.content}
                 </MarkdownContent>
               </div>

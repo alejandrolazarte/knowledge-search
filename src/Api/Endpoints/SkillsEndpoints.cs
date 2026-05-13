@@ -58,7 +58,7 @@ internal static class SkillsEndpoints
                     {
                         name = Path.GetFileName(dir);
                     }
-                    skills.Add(new SkillSummary(name, desc, Path.GetFileName(dir)));
+                    skills.Add(new SkillSummary(name, desc, Path.GetFileName(dir), Path.Combine(dir, "SKILL.md")));
                 }
                 catch (Exception)
                 {
@@ -81,6 +81,56 @@ internal static class SkillsEndpoints
                 return Results.NotFound();
             }
             return Results.Text(StripFrontmatter(File.ReadAllText(file)), "text/plain; charset=utf-8");
+        });
+
+        app.MapGet("/skill-file", (string path) =>
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return Results.BadRequest("Falta parámetro path");
+            }
+
+            var fullPath = Path.GetFullPath(path);
+            var skillsRoot = Path.GetFullPath(skillsDir);
+
+            if (!fullPath.StartsWith(skillsRoot + Path.DirectorySeparatorChar) && fullPath != skillsRoot)
+            {
+                return Results.BadRequest("Ruta fuera del directorio de skills");
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                return Results.NotFound();
+            }
+
+            return Results.Text(File.ReadAllText(fullPath), "text/plain; charset=utf-8");
+        });
+
+        app.MapPut("/skill-file", async (string path, HttpRequest request) =>
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return Results.BadRequest("Falta parámetro path");
+            }
+
+            var fullPath = Path.GetFullPath(path);
+            var skillsRoot = Path.GetFullPath(skillsDir);
+
+            if (!fullPath.StartsWith(skillsRoot + Path.DirectorySeparatorChar) && fullPath != skillsRoot)
+            {
+                return Results.BadRequest("Ruta fuera del directorio de skills");
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                return Results.NotFound();
+            }
+
+            using var reader = new StreamReader(request.Body);
+            var content = await reader.ReadToEndAsync();
+            await File.WriteAllTextAsync(fullPath, content);
+
+            return Results.Ok(new { saved = true, path = fullPath });
         });
     }
 
