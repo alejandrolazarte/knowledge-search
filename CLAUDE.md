@@ -44,6 +44,13 @@ app/                   ← frontend React
 - Tests aislados: sin dependencias externas reales (temp files para FS, in-memory para lógica pura)
 - Un assert principal por test (puede haber asserts de apoyo)
 
+### Documentación
+- Si se documenta una decisión operativa, de seguridad o de infraestructura, crear un Markdown en `docs/`.
+- Agregar un link desde `README.md` para que el documento sea descubrible.
+- Cuando la app esté corriendo, llamar `POST /index` después de crear o actualizar docs para que aparezcan en Knowledge Search.
+- Para cambios de configuración externa, documentar: estado inicial, comandos usados, por qué se aplicaron, estado final y comandos de auditoría.
+- La guía actual de hardening de GitHub vive en `D:\Documentation\Projects\knowledge-search\github-hardening.md`.
+
 ## Comandos
 
 ```bash
@@ -53,8 +60,11 @@ dotnet test
 # Levantar API (hot reload)
 cd src/Api && dotnet watch run
 
+# Instalar frontend de forma segura
+cd app && pnpm install --frozen-lockfile --ignore-scripts
+
 # Build frontend
-cd app && npm run build
+cd app && pnpm run build
 ```
 
 ## Variables de entorno

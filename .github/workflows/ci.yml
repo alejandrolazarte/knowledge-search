@@ -47,31 +47,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: app/package-lock.json
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.0 --activate
 
       - name: Restore .NET packages
         run: dotnet restore knowledge-search.slnx
 
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: app
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build frontend into API
-        run: npm run build
-        working-directory: app
-
-      - name: Install Playwright dependencies
-        run: npm ci
-        working-directory: e2e
+        run: pnpm --dir app run build
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-        working-directory: e2e
+        run: pnpm --dir e2e run install:browsers
 
       - name: Run E2E tests
-        run: npx playwright test
-        working-directory: e2e
+        run: pnpm --dir e2e run test
 
       - name: Upload Playwright report
         if: always()
