@@ -34,6 +34,10 @@ Abre `http://localhost:5111` en el navegador.
 - **Knowledge Search**: búsqueda FTS con BM25, filtros por root/modo, copia path con un clic, botón Re-index
 - **Skills**: grid con todas las skills de `~/.claude/skills`, filtro por nombre/descripción, panel lateral con markdown renderizado
 
+## Documentación
+
+- [GitHub hardening](docs/github-hardening.md): configuración de protección de `main`, Pull Requests obligatorios, permisos de Actions y comandos de auditoría.
+
 ### Variables de entorno
 
 | Variable | Default |

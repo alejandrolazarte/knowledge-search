@@ -44,6 +44,13 @@ app/                   ← frontend React
 - Tests aislados: sin dependencias externas reales (temp files para FS, in-memory para lógica pura)
 - Un assert principal por test (puede haber asserts de apoyo)
 
+### Documentación
+- Si se documenta una decisión operativa, de seguridad o de infraestructura, crear un Markdown en `docs/`.
+- Agregar un link desde `README.md` para que el documento sea descubrible.
+- Cuando la app esté corriendo, llamar `POST /index` después de crear o actualizar docs para que aparezcan en Knowledge Search.
+- Para cambios de configuración externa, documentar: estado inicial, comandos usados, por qué se aplicaron, estado final y comandos de auditoría.
+- La guía actual de hardening de GitHub vive en `docs/github-hardening.md`.
+
 ## Comandos
 
 ```bash
