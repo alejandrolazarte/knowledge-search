@@ -674,7 +674,7 @@ git commit -m "test: add When_DbServiceSearches"
 {
   "KnowledgeDb":   "D:/knowledge-search/knowledge.db",
   "KnowledgeDirs": "D:/Documentation",
-  "SkillsDir":     "C:/Users/Alejandro/.claude/skills"
+  "SkillsDir":     "C:/Users/<user>/.claude/skills"
 }
 ```
 

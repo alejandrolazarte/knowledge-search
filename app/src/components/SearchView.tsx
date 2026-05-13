@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { MarkdownContent } from './MarkdownContent'
-import { FileModal } from './FileModal'
 import type { SearchResult } from '../types'
 
 // ── History ───────────────────────────────────────────────────────────────────
@@ -42,13 +41,14 @@ const LIMITS = [5, 10, 20] as const
 type Limit = typeof LIMITS[number]
 
 interface Props {
-  statusMsg: string
-  onStatus:  (msg: string) => void
-  inputRef?: React.RefObject<HTMLInputElement | null>
+  statusMsg:   string
+  onStatus:    (msg: string) => void
+  inputRef?:   React.RefObject<HTMLInputElement | null>
+  onOpenFile:  (path: string) => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props) {
+export function SearchView({ statusMsg, onStatus, inputRef: externalRef, onOpenFile }: Props) {
   const localRef                              = useRef<HTMLInputElement>(null)
   const inputRef                              = externalRef ?? localRef
   const [query,           setQuery]           = useState('')
@@ -60,7 +60,6 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
   const [showHistory,     setShowHistory]     = useState(false)
   const [limit,           setLimit]           = useState<Limit>(10)
   const [copiedIdx,       setCopiedIdx]       = useState<number | null>(null)
-  const [openFile,        setOpenFile]        = useState<string | null>(null)
   const [showModes,       setShowModes]       = useState(false)
   const [activeModes,     setActiveModes]     = useState<ActiveModes>(loadModes)
   const [availableRoots,  setAvailableRoots]  = useState<string[]>([])
@@ -360,7 +359,7 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
                 <span className="text-sm font-medium text-gh-text truncate pr-2">{r.title}</span>
                 <div className="flex items-center gap-1 shrink-0">
                   {/* Ver archivo */}
-                  <button onClick={() => setOpenFile(r.path)} title="Ver archivo completo"
+                  <button onClick={() => onOpenFile(r.path)} title="Ver archivo completo"
                     className="p-1 rounded text-gh-muted hover:text-gh-accent hover:bg-gh-surface transition-colors"
                   >
                     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -432,7 +431,6 @@ export function SearchView({ statusMsg, onStatus, inputRef: externalRef }: Props
         })}
       </div>
 
-      <FileModal path={openFile} onClose={() => setOpenFile(null)} />
     </div>
   )
 }

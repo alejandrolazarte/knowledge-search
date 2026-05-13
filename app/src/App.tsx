@@ -3,6 +3,7 @@ import { Sidebar }    from './components/Sidebar'
 import { SearchView } from './components/SearchView'
 import { SkillsView } from './components/SkillsView'
 import { SkillPanel } from './components/SkillPanel'
+import { FilePanel }  from './components/FilePanel'
 import { GraphView }  from './components/GraphView'
 import { RepoSearchView } from './components/RepoSearchView'
 import { useTheme }    from './hooks/useTheme'
@@ -11,14 +12,30 @@ import type { Skill } from './types'
 
 type View = 'search' | 'repo-search' | 'skills' | 'graph'
 
+interface ActiveFile {
+  path:     string
+  endpoint: string
+}
+
 export function App() {
-  const { theme, setTheme }               = useTheme()
-  const { size: fontSize, setSize: setFontSize } = useFontSize()
-  const [view,        setView]            = useState<View>('search')
-  const [activeSkill, setActiveSkill]     = useState<Skill | null>(null)
-  const [reindexing,  setReindexing]      = useState(false)
-  const [statusMsg,   setStatusMsg]       = useState('')
-  const searchInputRef                    = useRef<HTMLInputElement>(null)
+  const { theme, setTheme }                       = useTheme()
+  const { size: fontSize, setSize: setFontSize }  = useFontSize()
+  const [view,        setView]                    = useState<View>('search')
+  const [activeSkill, setActiveSkill]             = useState<Skill | null>(null)
+  const [activeFile,  setActiveFile]              = useState<ActiveFile | null>(null)
+  const [reindexing,  setReindexing]              = useState(false)
+  const [statusMsg,   setStatusMsg]               = useState('')
+  const searchInputRef                            = useRef<HTMLInputElement>(null)
+
+  // Opening a file closes any skill (and vice versa) so only one right panel is active
+  const openFile = (path: string, endpoint: string = '/file') => {
+    setActiveSkill(null)
+    setActiveFile({ path, endpoint })
+  }
+  const openSkill = (skill: Skill | null) => {
+    setActiveFile(null)
+    setActiveSkill(skill)
+  }
 
   // Ctrl+K — focus search from anywhere
   useEffect(() => {
@@ -26,7 +43,6 @@ export function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         if (view !== 'search') setView('search')
-        // small delay if view switch needed to let component mount
         setTimeout(() => {
           searchInputRef.current?.focus()
           searchInputRef.current?.select()
@@ -37,7 +53,6 @@ export function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [view])
 
-  // Auto-reindex on mount — silent, keeps index fresh
   useEffect(() => {
     fetch('/index', { method: 'POST' }).catch(() => {})
   }, [])
@@ -66,7 +81,7 @@ export function App() {
         onFontSize={setFontSize}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="h-10 border-b border-gh-border flex items-center px-4 gap-3 shrink-0">
           <span className="text-sm font-medium">
             {view === 'search' ? 'Knowledge Search' : view === 'repo-search' ? 'Repo Search' : view === 'skills' ? 'Skills' : 'Code Graph'}
@@ -89,19 +104,24 @@ export function App() {
         </header>
 
         {view === 'search' && (
-          <SearchView statusMsg={statusMsg} onStatus={setStatusMsg} inputRef={searchInputRef} />
+          <SearchView statusMsg={statusMsg} onStatus={setStatusMsg} inputRef={searchInputRef} onOpenFile={openFile} />
         )}
         {view === 'repo-search' && (
-          <RepoSearchView />
+          <RepoSearchView onOpenFile={openFile} />
         )}
         {view === 'skills' && (
-          <SkillsView onOpen={setActiveSkill} active={activeSkill} />
+          <SkillsView onOpen={openSkill} active={activeSkill} />
         )}
         {view === 'graph' && (
           <GraphView />
         )}
       </div>
 
+      <FilePanel
+        path={activeFile?.path ?? null}
+        endpoint={activeFile?.endpoint}
+        onClose={() => setActiveFile(null)}
+      />
       <SkillPanel skill={activeSkill} onClose={() => setActiveSkill(null)} />
     </div>
   )

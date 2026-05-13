@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { FileModal } from './FileModal'
 import { MarkdownContent } from './MarkdownContent'
 import type { CodeDocumentSearchResult } from '../types'
 
@@ -49,7 +48,11 @@ function codeBlock(content: string, path: string): string {
   return `\`\`\`${languageForPath(path)}\n${content.trim()}\n\`\`\``
 }
 
-export function RepoSearchView() {
+interface Props {
+  onOpenFile: (path: string, endpoint?: string) => void
+}
+
+export function RepoSearchView({ onOpenFile }: Props) {
   const [query, setQuery] = useState('')
   const [searchedQuery, setSearchedQuery] = useState('')
   const [results, setResults] = useState<CodeDocumentSearchResult[]>([])
@@ -61,7 +64,6 @@ export function RepoSearchView() {
   const [selectedKinds, setSelectedKinds] = useState<string[]>(() => loadArray(KINDS_KEY))
   const [activeModes, setActiveModes] = useState<ActiveModes>(() => loadJson(MODES_KEY, DEFAULT_MODES))
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
-  const [openFile, setOpenFile] = useState<string | null>(null)
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
 
   useEffect(() => {
@@ -257,7 +259,7 @@ export function RepoSearchView() {
                   </button>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => setOpenFile(result.filePath)}
+                  <button onClick={() => onOpenFile(result.filePath, '/repos/file')}
                     className="text-xs border border-gh-border rounded px-2 py-0.5 text-gh-muted hover:text-gh-text hover:bg-gh-surface"
                   >
                     Ver
@@ -290,7 +292,6 @@ export function RepoSearchView() {
         })}
       </div>
 
-      <FileModal path={openFile} onClose={() => setOpenFile(null)} endpoint="/repos/file" />
     </div>
   )
 }

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnowledgeSearch;
@@ -11,33 +12,44 @@ internal sealed class CodeGraphService(
     private static readonly HashSet<string> ExcludedDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "node_modules", ".git", "bin", "obj",
+        "dist", "build", "out", "coverage", "TestResults",
+        ".next", ".nuxt", ".turbo", ".cache", ".vite", ".svelte-kit",
+        ".pnpm-store", "storybook-static", ".vs", ".idea",
     };
 
     public CodeGraphScanResult ScanDirectory(string directoryPath)
     {
-        var allNodes = new List<CodeNode>();
-        var allEdges = new List<CodeEdge>();
+        var allNodes = new ConcurrentBag<CodeNode>();
+        var allEdges = new ConcurrentBag<CodeEdge>();
         var filesScanned = 0;
         var filesSkipped = 0;
 
-        foreach (var filePath in EnumerateSourceFiles(directoryPath))
+        var sourceFiles = EnumerateSourceFiles(directoryPath).ToList();
+
+        Parallel.ForEach(sourceFiles, filePath =>
         {
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
             var parser = _keyedServiceProvider.GetKeyedService<ISourceFileParser>(extension);
 
             if (parser is null)
             {
-                filesSkipped++;
-                continue;
+                Interlocked.Increment(ref filesSkipped);
+                return;
             }
 
             var parsedFile = parser.Parse(filePath);
-            allNodes.AddRange(parsedFile.Nodes);
-            allEdges.AddRange(parsedFile.Edges);
-            filesScanned++;
-        }
+            foreach (var node in parsedFile.Nodes)
+            {
+                allNodes.Add(node);
+            }
+            foreach (var edge in parsedFile.Edges)
+            {
+                allEdges.Add(edge);
+            }
+            Interlocked.Increment(ref filesScanned);
+        });
 
-        var scanResult = new CodeGraphScanResult(allNodes, allEdges, filesScanned, filesSkipped);
+        var scanResult = new CodeGraphScanResult(allNodes.ToList(), allEdges.ToList(), filesScanned, filesSkipped);
         var repositoryName = Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         repository.SaveScanResult(repositoryName, scanResult);
 
