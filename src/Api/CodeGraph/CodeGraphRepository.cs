@@ -298,45 +298,66 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
             .GroupBy(n => n.Identifier, StringComparer.Ordinal)
             .Select(g => g.First());
 
+        using var command = new SqliteCommand(InsertNodeSql, _connection, transaction);
+        var repoNameParam = command.Parameters.Add("@repoName", SqliteType.Text);
+        var identifierParam = command.Parameters.Add("@identifier", SqliteType.Text);
+        var nameParam = command.Parameters.Add("@name", SqliteType.Text);
+        var kindParam = command.Parameters.Add("@kind", SqliteType.Text);
+        var filePathParam = command.Parameters.Add("@filePath", SqliteType.Text);
+        var lineParam = command.Parameters.Add("@line", SqliteType.Integer);
+
         foreach (var node in uniqueNodes)
         {
-            using var command = new SqliteCommand(InsertNodeSql, _connection, transaction);
-            command.Parameters.AddWithValue("@repoName", repositoryName);
-            command.Parameters.AddWithValue("@identifier", node.Identifier);
-            command.Parameters.AddWithValue("@name", node.Name);
-            command.Parameters.AddWithValue("@kind", node.Kind.ToString());
-            command.Parameters.AddWithValue("@filePath", node.FilePath);
-            command.Parameters.AddWithValue("@line", node.Line);
+            repoNameParam.Value = repositoryName;
+            identifierParam.Value = node.Identifier;
+            nameParam.Value = node.Name;
+            kindParam.Value = node.Kind.ToString();
+            filePathParam.Value = node.FilePath;
+            lineParam.Value = node.Line;
             command.ExecuteNonQuery();
         }
     }
 
     private void InsertEdges(string repositoryName, IReadOnlyList<CodeEdge> edges, SqliteTransaction transaction)
     {
+        using var command = new SqliteCommand(InsertEdgeSql, _connection, transaction);
+        var repoNameParam = command.Parameters.Add("@repoName", SqliteType.Text);
+        var sourceIdentifierParam = command.Parameters.Add("@sourceIdentifier", SqliteType.Text);
+        var targetIdentifierParam = command.Parameters.Add("@targetIdentifier", SqliteType.Text);
+        var kindParam = command.Parameters.Add("@kind", SqliteType.Text);
+        var lineParam = command.Parameters.Add("@line", SqliteType.Integer);
+
         foreach (var edge in edges)
         {
-            using var command = new SqliteCommand(InsertEdgeSql, _connection, transaction);
-            command.Parameters.AddWithValue("@repoName", repositoryName);
-            command.Parameters.AddWithValue("@sourceIdentifier", edge.SourceIdentifier);
-            command.Parameters.AddWithValue("@targetIdentifier", edge.TargetIdentifier);
-            command.Parameters.AddWithValue("@kind", edge.Kind.ToString());
-            command.Parameters.AddWithValue("@line", edge.Line);
+            repoNameParam.Value = repositoryName;
+            sourceIdentifierParam.Value = edge.SourceIdentifier;
+            targetIdentifierParam.Value = edge.TargetIdentifier;
+            kindParam.Value = edge.Kind.ToString();
+            lineParam.Value = edge.Line;
             command.ExecuteNonQuery();
         }
     }
 
     private void InsertDocuments(string repositoryName, IReadOnlyList<CodeDocument> documents, SqliteTransaction transaction)
     {
+        using var command = new SqliteCommand(InsertDocumentSql, _connection, transaction);
+        var repoNameParam = command.Parameters.Add("@repoName", SqliteType.Text);
+        var identifierParam = command.Parameters.Add("@identifier", SqliteType.Text);
+        var nameParam = command.Parameters.Add("@name", SqliteType.Text);
+        var kindParam = command.Parameters.Add("@kind", SqliteType.Text);
+        var contentParam = command.Parameters.Add("@content", SqliteType.Text);
+        var filePathParam = command.Parameters.Add("@filePath", SqliteType.Text);
+        var lineParam = command.Parameters.Add("@line", SqliteType.Integer);
+
         foreach (var document in documents)
         {
-            using var command = new SqliteCommand(InsertDocumentSql, _connection, transaction);
-            command.Parameters.AddWithValue("@repoName", repositoryName);
-            command.Parameters.AddWithValue("@identifier", document.Identifier);
-            command.Parameters.AddWithValue("@name", document.Name);
-            command.Parameters.AddWithValue("@kind", document.Kind.ToString());
-            command.Parameters.AddWithValue("@content", document.Content);
-            command.Parameters.AddWithValue("@filePath", document.FilePath);
-            command.Parameters.AddWithValue("@line", document.Line);
+            repoNameParam.Value = repositoryName;
+            identifierParam.Value = document.Identifier;
+            nameParam.Value = document.Name;
+            kindParam.Value = document.Kind.ToString();
+            contentParam.Value = document.Content;
+            filePathParam.Value = document.FilePath;
+            lineParam.Value = document.Line;
             command.ExecuteNonQuery();
         }
     }

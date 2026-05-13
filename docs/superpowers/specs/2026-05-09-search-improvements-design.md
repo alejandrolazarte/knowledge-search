@@ -53,7 +53,7 @@ Devuelto por el middleware global en respuestas 500.
 {
   "KnowledgeDb":   "D:\\Documentation\\knowledge.db",
   "KnowledgeDirs": "D:\\Documentation",
-  "SkillsDir":     "C:\\Users\\Alejandro\\.claude\\skills"
+  "SkillsDir":     "C:\\Users\\<user>\\.claude\\skills"
 }
 ```
 

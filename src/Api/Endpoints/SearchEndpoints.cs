@@ -69,6 +69,32 @@ internal static class SearchEndpoints
             return Results.Text(File.ReadAllText(fullPath), "text/plain; charset=utf-8");
         });
 
+        app.MapPut("/file", async (string path, HttpRequest request, IDbService dbService) =>
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return Results.BadRequest("Falta parámetro path");
+            }
+
+            var fullPath = Path.GetFullPath(path);
+
+            if (!dbService.IsPathAllowed(fullPath))
+            {
+                return Results.BadRequest("Ruta fuera de los roots configurados");
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                return Results.NotFound();
+            }
+
+            using var reader = new StreamReader(request.Body);
+            var content = await reader.ReadToEndAsync();
+            await File.WriteAllTextAsync(fullPath, content);
+
+            return Results.Ok(new { saved = true, path = fullPath });
+        });
+
         app.MapGet("/image", (string path, IDbService dbService) =>
         {
             if (string.IsNullOrWhiteSpace(path))
