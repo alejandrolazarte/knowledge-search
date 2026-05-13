@@ -1,4 +1,5 @@
 packages:
   - app
+  - e2e
 
 minimumReleaseAge: 4320
