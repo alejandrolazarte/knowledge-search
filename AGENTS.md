@@ -11,8 +11,6 @@ Instructions for Codex when working in this repository.
 - Frontend: React 19, TypeScript, Tailwind, Vite.
 - Tests: xUnit, Shouldly, Moq.
 
-The app indexes Markdown documentation from `D:\Documentation` and can scan source repositories to build a code graph plus repo code search.
-
 ## Repository Structure
 
 ```text
@@ -24,7 +22,54 @@ src/Api/
   Program.cs           Composition root and endpoint registration
 test/Api.Tests/        xUnit tests
 app/                   React frontend
+data/                  SQLite DB + log (never included in image)
 docs/                  Project documentation and runbooks
+```
+
+## RULE: always Podman, never local
+
+All execution and compilation happens inside a Podman container. Never run `dotnet run`, `dotnet watch run`, `pnpm install`, `pnpm run build`, or `pnpm run dev` directly on the host. If the user explicitly requests it, ask for confirmation before proceeding.
+
+## Environment variables (required before running scripts)
+
+Scripts contain no personal paths. Set these before use:
+
+```powershell
+$env:KNOWLEDGE_DIR = "C:\path\to\your\knowledge"   # required
+$env:SKILLS_DIR    = "~\.claude\skills"             # optional, inferred by default
+```
+
+## Production use (no code changes)
+
+```powershell
+dotnet run scripts/podman/podman-run.cs                    # foreground with logs
+dotnet run scripts/podman/podman-run.cs -- --detach        # start in background
+dotnet run scripts/podman/podman-run.cs -- --build         # rebuild image + start
+podman ps --filter name=knowledge-search
+podman logs knowledge-search
+podman stop knowledge-search
+```
+
+URL: `http://localhost:5111`
+
+## Active development (editing code)
+
+Source code is edited on the host. Compilation and execution happen inside the container. `node_modules` lives in an isolated Podman volume (`knowledge-search-node_modules`) and never touches the host filesystem.
+
+```powershell
+dotnet run scripts/podman/podman-dev.cs -- --build --install-deps   # first time setup
+dotnet run scripts/podman/podman-dev.cs                              # hot reload (.cs)
+dotnet run scripts/podman/podman-dev.cs -- --build-frontend          # after changing app/
+dotnet run scripts/podman/podman-dev.cs -- --install-deps            # after changing package.json
+```
+
+URL: `http://localhost:5112`
+
+## Tests (always allowed, run on host)
+
+```powershell
+dotnet test test\Api.Tests\Api.Tests.csproj --no-restore -v minimal
+dotnet build src\Api\Api.csproj --no-restore -v minimal
 ```
 
 ## Coding Conventions
@@ -43,16 +88,6 @@ docs/                  Project documentation and runbooks
 - Keep tests isolated. Use temp files for filesystem tests and avoid external services.
 - Run focused tests for the changed area before claiming completion.
 
-Useful commands:
-
-```powershell
-dotnet test test\Api.Tests\Api.Tests.csproj --no-restore -v minimal
-dotnet build src\Api\Api.csproj --no-restore -v minimal
-cd app
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm run build
-```
-
 ## Documentation
 
 When documenting an operational, security, infrastructure, or external configuration decision:
@@ -60,8 +95,6 @@ When documenting an operational, security, infrastructure, or external configura
 1. Create or update a Markdown file in `docs/`.
 2. Link it from `README.md` when it should be discoverable from the repo root.
 3. Include the initial state, exact commands used, why each change was made, the final state, and audit commands.
-4. If the running app should surface the document through Knowledge Search, also add/update the corresponding document under `D:\Documentation`.
-5. When touching `D:\Documentation`, follow its own `D:\Documentation\AGENTS.md`: update `index.md` and `log.md`.
 
 Current runbook:
 
@@ -102,25 +135,13 @@ Audit command:
 gh api repos/alejandrolazarte/knowledge-search/rulesets/16156415
 ```
 
-Expected important fields:
-
-```json
-{
-  "enforcement": "active",
-  "bypass_actors": [],
-  "current_user_can_bypass": "never"
-}
-```
-
 ## Frontend Notes
 
 - Match existing React/Tailwind style.
 - Keep tool UIs dense and usable; avoid landing-page composition.
 - Use existing shared components before creating new ones.
 - The frontend uses `pnpm`, not npm.
-- Install with `pnpm install --frozen-lockfile --ignore-scripts`.
-- Run `pnpm run build` after TypeScript/frontend changes.
-- Do not run package install commands that execute dependency lifecycle scripts unless the user explicitly approves it.
+- All pnpm commands (`install`, `build`, `dev`) must run inside the container via `scripts/podman/podman-dev.cs`.
 
 ## Backend Notes
 

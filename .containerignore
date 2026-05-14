@@ -1,0 +1,14 @@
+data/
+app/node_modules
+app/dist
+**/bin
+**/obj
+knowledge.db
+knowledge.db-shm
+knowledge.db-wal
+knowledge.log
+e2e/
+test/
+docs/
+tmp-*
+.git

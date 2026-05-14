@@ -20,6 +20,9 @@ src/Api/appsettings.json
 node_modules/
 app/node_modules/
 app/dist/
+
+# pnpm content-addressable store (se genera al correr pnpm install localmente)
+.pnpm-store/
 src/Api/assets/
 src/Api/index.html
 

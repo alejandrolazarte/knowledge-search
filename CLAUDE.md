@@ -20,6 +20,52 @@ src/Api/
   Program.cs           ← composición raíz + endpoints
 test/Api.Tests/        ← tests xUnit (TDD)
 app/                   ← frontend React
+data/                  ← SQLite DB + log (no va en la imagen)
+```
+
+## REGLA: siempre Podman, nunca local
+
+Toda ejecución y compilación ocurre dentro de un contenedor Podman. Nunca ejecutar `dotnet run`, `dotnet watch run`, `pnpm install`, `pnpm run build` ni `pnpm run dev` directamente en el host. Si el usuario lo pide explícitamente, pedirle confirmación antes de proceder.
+
+## Variables de entorno requeridas
+
+Los scripts no tienen paths hardcodeados. Antes de usarlos:
+
+```powershell
+$env:KNOWLEDGE_DIR = "C:\ruta\a\tu\knowledge"   # requerido
+$env:SKILLS_DIR    = "~\.claude\skills"          # opcional
+```
+
+## Uso productivo (sin tocar código)
+
+```powershell
+dotnet run scripts/podman/podman-run.cs                    # foreground con logs
+dotnet run scripts/podman/podman-run.cs -- --detach        # arrancar en background
+dotnet run scripts/podman/podman-run.cs -- --build         # rebuild imagen + arrancar
+podman ps --filter name=knowledge-search
+podman logs knowledge-search
+podman stop knowledge-search
+```
+
+URL: `http://localhost:5111`
+
+## Desarrollo activo (modificando código)
+
+```powershell
+dotnet run scripts/podman/podman-dev.cs -- --build --install-deps   # primera vez
+dotnet run scripts/podman/podman-dev.cs                              # hot reload .cs
+dotnet run scripts/podman/podman-dev.cs -- --build-frontend          # tras cambiar app/
+dotnet run scripts/podman/podman-dev.cs -- --install-deps            # tras cambiar package.json
+```
+
+URL: `http://localhost:5112`  
+`node_modules` vive en el volumen Podman `knowledge-search-node_modules` — nunca toca el host.
+
+## Tests (permitidos sin aprobación, corren en el host)
+
+```powershell
+dotnet test
+dotnet build src/Api/Api.csproj --no-restore
 ```
 
 ## Convenciones de código
@@ -49,23 +95,6 @@ app/                   ← frontend React
 - Agregar un link desde `README.md` para que el documento sea descubrible.
 - Cuando la app esté corriendo, llamar `POST /index` después de crear o actualizar docs para que aparezcan en Knowledge Search.
 - Para cambios de configuración externa, documentar: estado inicial, comandos usados, por qué se aplicaron, estado final y comandos de auditoría.
-- La guía actual de hardening de GitHub vive en `D:\Documentation\Projects\knowledge-search\github-hardening.md`.
-
-## Comandos
-
-```bash
-# Correr tests
-dotnet test
-
-# Levantar API (hot reload)
-cd src/Api && dotnet watch run
-
-# Instalar frontend de forma segura
-cd app && pnpm install --frozen-lockfile --ignore-scripts
-
-# Build frontend
-cd app && pnpm run build
-```
 
 ## Variables de entorno
 

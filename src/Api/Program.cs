@@ -2,7 +2,7 @@ using KnowledgeSearch;
 using Microsoft.AspNetCore.Diagnostics;
 
 var builder = WebApplication.CreateSlimBuilder(args);
-builder.WebHost.UseUrls("http://localhost:5111");
+builder.WebHost.UseUrls(Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://localhost:5111");
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default));
 
@@ -35,8 +35,25 @@ var logPath = Path.ChangeExtension(dbPath, ".log");
 var dbService = new DbService(dbPath, roots);
 builder.Services.AddSingleton<IDbService>(dbService);
 builder.Services.AddSingleton<ILogService>(new LogService(logPath));
+var fileWatcherMode = Environment.GetEnvironmentVariable("FILE_WATCHER")
+    ?? builder.Configuration["FileWatcher"]
+    ?? "fsw";
+
+if (fileWatcherMode == "polling")
+{
+    builder.Services.AddSingleton<IFileChangeSource>(new PollingChangeSource(TimeSpan.FromSeconds(5)));
+}
+else
+{
+    builder.Services.AddSingleton<IFileChangeSource, FileSystemChangeSource>();
+}
+
 builder.Services.AddHostedService(serviceProvider =>
-    new WatcherService(roots, serviceProvider.GetRequiredService<IDbService>(), serviceProvider.GetRequiredService<ILogService>()));
+    new WatcherService(
+        roots,
+        serviceProvider.GetRequiredService<IDbService>(),
+        serviceProvider.GetRequiredService<ILogService>(),
+        serviceProvider.GetRequiredService<IFileChangeSource>()));
 
 builder.Services.AddSingleton<ICodeGraphRepository>(_ => new CodeGraphRepository(dbPath));
 builder.Services.AddKeyedSingleton<ISourceFileParser, CSharpParser>(".cs");

@@ -1,0 +1,7 @@
+<Project>
+  <!-- Scripts standalone — no heredan las reglas de estilo del repo -->
+  <PropertyGroup>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <AnalysisLevel>none</AnalysisLevel>
+  </PropertyGroup>
+</Project>

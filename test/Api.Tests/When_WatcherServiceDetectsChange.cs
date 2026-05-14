@@ -22,7 +22,7 @@ public class When_WatcherServiceDetectsChange : IDisposable
         var filePath = Path.Combine(_docsDir, "guide.md");
         File.WriteAllText(filePath, "# Title\nSome content");
 
-        using (var sut = new WatcherService([_docsDir], _mockDb.Object, _mockLog.Object))
+        using (var sut = new WatcherService([_docsDir], _mockDb.Object, _mockLog.Object, new Mock<IFileChangeSource>().Object))
         {
             sut.ProcessChange(filePath, "added");
 
