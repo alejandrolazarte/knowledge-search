@@ -1,0 +1,24 @@
+# Imagen de desarrollo — SDK completo, source code montado en /workspace
+# Nunca ejecuta código del host directamente; dotnet watch y pnpm corren aislados
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+# Node.js 22 + pnpm
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && corepack enable \
+    && corepack prepare pnpm@11.0.0 --activate \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Polling en lugar de inotify — necesario para volúmenes Podman en Windows
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+ENV ASPNETCORE_URLS=http://+:5111
+ENV FILE_WATCHER=polling
+ENV KNOWLEDGE_DB=/data/db/knowledge.db
+ENV KNOWLEDGE_DIR=/data/knowledge
+ENV SKILLS_DIR=/data/skills
+
+EXPOSE 5111
+
+CMD ["dotnet", "watch", "run", "--project", "src/Api/Api.csproj", "--non-interactive"]

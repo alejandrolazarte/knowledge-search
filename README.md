@@ -4,81 +4,114 @@ Motor de búsqueda full-text para uno o más directorios de conocimiento y visor
 
 ## Requisitos
 
-- .NET 10 SDK
-- Node.js 18+ (solo para desarrollo del frontend)
+- .NET 10 SDK (para correr los scripts de Podman)
+- Podman Desktop o Podman CLI
 
-## Uso
+No se necesita Node.js en el host. Todo lo demás compila y corre dentro del contenedor.
 
-### Levantar la API + UI
+## Setup inicial — variables de entorno
 
-**Con hot reload (recomendado para desarrollo):**
+Los scripts no contienen paths personales. Definí estas variables en tu perfil de PowerShell (`$PROFILE`):
 
-```bash
-cd knowledge-search/src/Api
-dotnet watch run
+```powershell
+$env:KNOWLEDGE_DIR = "C:\ruta\a\tu\carpeta\knowledge"   # requerido
+$env:SKILLS_DIR    = "C:\Users\<tu-user>\.claude\skills" # opcional, se infiere por defecto
 ```
 
-El servidor recarga automáticamente al guardar cambios `.cs`. Workflow recomendado: **terminá todos los cambios antes de guardar** para evitar recargas con código a mitad de refactor.
+---
 
-**Sin watch (one-shot):**
+## Uso productivo
 
-```bash
-cd knowledge-search/src/Api
-dotnet run
+La app corre en un contenedor Podman. Los únicos directorios visibles desde el contenedor son los tres mounts explícitos — el resto de la máquina es inaccesible.
+
+```powershell
+cd knowledge-search
+
+dotnet run scripts/podman/podman-run.cs                   # foreground (ver logs en vivo)
+dotnet run scripts/podman/podman-run.cs -- --detach       # arrancar en background
+dotnet run scripts/podman/podman-run.cs -- --build        # rebuild imagen + arrancar
 ```
 
-Abre `http://localhost:5111` en el navegador.
+Abre `http://localhost:5111`.
 
-### Vistas
+---
 
-- **Knowledge Search**: búsqueda FTS con BM25, filtros por root/modo, copia path con un clic, botón Re-index
-- **Skills**: grid con todas las skills de `~/.claude/skills`, filtro por nombre/descripción, panel lateral con markdown renderizado
+## Desarrollo activo
 
-## Documentación
+El source se edita en el host con tu editor. `dotnet watch`, `pnpm install` y `pnpm run build` corren dentro del contenedor. Los `node_modules` viven en un volumen Podman aislado (`knowledge-search-node_modules`) y nunca tocan el host.
 
-- GitHub hardening: documentado en `D:\Documentation\Projects\knowledge-search\github-hardening.md`.
+```powershell
+dotnet run scripts/podman/podman-dev.cs -- --build --install-deps   # primera vez
+dotnet run scripts/podman/podman-dev.cs                              # hot reload (.cs)
+dotnet run scripts/podman/podman-dev.cs -- --build-frontend          # tras cambiar app/
+dotnet run scripts/podman/podman-dev.cs -- --install-deps            # tras cambiar package.json
+```
 
-### Variables de entorno
+Abre `http://localhost:5112`.
 
-| Variable | Default |
+> `dotnet watch` usa polling (`DOTNET_USE_POLLING_FILE_WATCHER=true`) para detectar cambios a través de volúmenes Podman en Windows.
+
+---
+
+## Archivos de contenedor
+
+| Archivo | Descripción |
 |---|---|
-| `KNOWLEDGE_DB` | `../knowledge.db` (relativo al `Api/`) |
-| `KnowledgeDirs` / `KNOWLEDGE_DIRS` | `../knowledge` (relativo al `Api/`), múltiples roots separados por `;` |
-| `KnowledgeDir` / `KNOWLEDGE_DIR` | compatibilidad con un único root |
-| `SKILLS_DIR` | `~/.claude/skills` |
+| `Containerfile` | Build multi-stage: Node → .NET SDK → ASP.NET runtime (imagen productiva) |
+| `Containerfile.dev` | .NET SDK 10 + Node 22 + pnpm, sin source code (imagen de desarrollo) |
+| `scripts/podman/podman-run.cs` | Script C# — arranca el contenedor productivo |
+| `scripts/podman/podman-dev.cs` | Script C# — orquesta imagen dev: build, pnpm, hot reload |
+| `.containerignore` | Excluye `node_modules`, binarios, DB y archivos tmp del build context |
+| `data/` | SQLite DB + log (montado en el contenedor, nunca incluido en la imagen) |
 
-### API REST
+## Mounts
+
+| Host | Contenedor | Contenido |
+|---|---|---|
+| `knowledge-search/data/` | `/data/db` | SQLite DB + log |
+| `$env:KNOWLEDGE_DIR` | `/data/knowledge` | Docs Markdown |
+| `$env:SKILLS_DIR` (o `~/.claude/skills`) | `/data/skills` | Skills de Claude Code |
+
+## Variables de entorno
+
+| Variable | Valor en contenedor | Default local |
+|---|---|---|
+| `KNOWLEDGE_DB` | `/data/db/knowledge.db` | `../knowledge.db` |
+| `KNOWLEDGE_DIR` | `/data/knowledge` | `../knowledge` |
+| `SKILLS_DIR` | `/data/skills` | `~/.claude/skills` |
+
+## API REST
 
 | Endpoint | Descripción |
 |---|---|
 | `GET /search?q=texto&limit=5&modes=phrase,and,or&roots=knowledge` | Busca en el índice (BM25) |
 | `POST /index` | Re-indexa el directorio (incremental) |
 | `GET /roots` | Lista roots configurados |
-| `GET /file?path=...` | Lee un archivo permitido dentro de un root |
+| `GET /file?path=...` | Lee un archivo dentro de un root permitido |
 | `GET /image?path=...` | Sirve imágenes locales referenciadas por Markdown |
 | `GET /skills` | Lista de skills (nombre, descripción) |
 | `GET /skills/{dir}` | Contenido crudo de una skill |
 | `GET /health` | Health check |
 
-## Desarrollo del frontend
+## Vistas
 
-El frontend usa `pnpm` con configuración defensiva contra supply-chain attacks:
+- **Knowledge Search**: búsqueda FTS con BM25, filtros por root/modo, copia path con un clic, botón Re-index
+- **Skills**: grid con todas las skills de `~/.claude/skills`, filtro por nombre/descripción, panel lateral con markdown renderizado
 
-- `ignore-scripts=true`: no ejecuta scripts automáticos de dependencias durante install.
-- `minimumReleaseAge: 4320`: espera 3 días antes de aceptar versiones recién publicadas.
-- `save-exact=true`: evita rangos nuevos al agregar dependencias.
+## Stack
 
-```bash
-cd knowledge-search/app
-corepack enable
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm run dev   # dev server en :5173, proxy a :5111
-```
+- Backend: ASP.NET Core Minimal API (.NET 10), C#
+- Persistencia: SQLite FTS5 (trigramas + BM25)
+- Frontend: Vite 6 · React 19 · TypeScript 5 · Tailwind 3 · react-markdown
+- Tests: xUnit + Shouldly + Moq
 
-Para generar el build de producción (emite a `Api/`):
+## Seguridad de dependencias
 
-```bash
-pnpm run build
-```
+El frontend usa `pnpm` con configuración defensiva:
 
-**Stack:** Vite 6 · React 19 · TypeScript 5 · Tailwind 3 · react-markdown
+- `ignore-scripts=true` — no ejecuta scripts automáticos durante install
+- `minimumReleaseAge: 4320` — espera 3 días antes de aceptar versiones recién publicadas
+- `save-exact=true` — evita rangos al agregar dependencias
+
+Combinado con el aislamiento de Podman, ningún paquete puede acceder al host más allá de los mounts explícitos.
+
