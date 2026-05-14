@@ -96,11 +96,6 @@ When documenting an operational, security, infrastructure, or external configura
 2. Link it from `README.md` when it should be discoverable from the repo root.
 3. Include the initial state, exact commands used, why each change was made, the final state, and audit commands.
 
-Current runbook:
-
-```text
-D:\Documentation\Projects\knowledge-search\github-hardening.md
-```
 
 ## Git Workflow
 

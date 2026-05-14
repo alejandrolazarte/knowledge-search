@@ -115,6 +115,3 @@ El frontend usa `pnpm` con configuración defensiva:
 
 Combinado con el aislamiento de Podman, ningún paquete puede acceder al host más allá de los mounts explícitos.
 
-## Documentación
-
-- GitHub hardening: `D:\Documentation\Projects\knowledge-search\github-hardening.md`
