@@ -9,13 +9,12 @@
 //   --build-frontend   pnpm run build dentro del contenedor (tras cambiar app/)
 //   (sin flags)        arranca dotnet watch con hot reload de .cs
 //
-// Variables de entorno requeridas:
-//   KNOWLEDGE_DIRS  path(s) a carpetas con archivos .md de knowledge, separados por ;
-//
+// No requiere variables de entorno. Las fuentes se configuran desde la UI de Sources.
 // Variables de entorno opcionales:
-//   SKILLS_DIR      path a los skills de Claude (default: ~/.claude/skills)
+//   SKILLS_DIR  path a los skills de Claude (default: ~/.claude/skills)
 
 using System.Diagnostics;
+using System.Text.Json;
 
 var build         = args.Contains("--build");
 var installDeps   = args.Contains("--install-deps");
@@ -23,9 +22,7 @@ var buildFrontend = args.Contains("--build-frontend");
 
 var root      = FindRoot();
 var dataDir   = Path.Combine(root, "data");
-var knowledgeRoots = RequireEnv("KNOWLEDGE_DIRS",
-    "Ejemplo: $env:KNOWLEDGE_DIRS = 'D:\\mis-docs\\knowledge'");
-var knowledgeMounts = BuildKnowledgeMounts(knowledgeRoots);
+var sourceMounts = BuildSourceMounts(dataDir);
 var skills    = Environment.GetEnvironmentVariable("SKILLS_DIR")
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
 
@@ -38,9 +35,9 @@ string[] baseVols =
     "-v", $"{root}:/workspace:Z",
     "-v", $"{NodeVolume}:/workspace/app/node_modules",
     "-v", $"{dataDir}:/data/db:Z",
-    ..knowledgeMounts.VolumeArgs,
+    ..sourceMounts,
     "-v", $"{skills}:/data/skills:Z",
-    "-e", $"KNOWLEDGE_DIRS={knowledgeMounts.ContainerRoots}",
+    "-e", "SOURCES_CONFIG=/data/db/sources.json",
 ];
 
 if (build)
@@ -86,45 +83,85 @@ static string FindRoot()
     throw new InvalidOperationException("Project root no encontrado (buscando Containerfile).");
 }
 
-static string RequireEnv(string name, string hint)
+static string[] BuildSourceMounts(string dataDir)
 {
-    var val = Environment.GetEnvironmentVariable(name);
-    if (val is not null) return val;
-
-    Console.ForegroundColor = ConsoleColor.Red;
-    Console.Error.WriteLine($"ERROR: {name} no está seteado. {hint}");
-    Console.ResetColor();
-    Environment.Exit(1);
-    return null!;
-}
-
-static KnowledgeMounts BuildKnowledgeMounts(string configuredRoots)
-{
-    var hostRoots = configuredRoots
-        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Select(Path.GetFullPath)
-        .ToArray();
-
-    if (hostRoots.Length == 0)
+    var sourcesJson = Path.Combine(dataDir, "sources.json");
+    if (!File.Exists(sourcesJson))
     {
-        throw new InvalidOperationException("KNOWLEDGE_DIRS no contiene roots válidos.");
+        return [];
     }
 
     var volumeArgs = new List<string>();
-    var containerRoots = new List<string>();
-
-    for (var i = 0; i < hostRoots.Length; i++)
+    var mountedDestinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    using var document = JsonDocument.Parse(File.ReadAllText(sourcesJson));
+    if (!TryGetProperty(document.RootElement, "sources", out var sourcesElement)
+        || sourcesElement.ValueKind != JsonValueKind.Array)
     {
-        var containerRoot = hostRoots.Length == 1
-            ? "/data/knowledge"
-            : $"/data/knowledge/root{i + 1}";
-
-        volumeArgs.Add("-v");
-        volumeArgs.Add($"{hostRoots[i]}:{containerRoot}:Z");
-        containerRoots.Add(containerRoot);
+        return [];
     }
 
-    return new KnowledgeMounts(volumeArgs.ToArray(), string.Join(';', containerRoots));
+    foreach (var source in sourcesElement.EnumerateArray())
+    {
+        var hostPathValue = TryGetStringProperty(source, "hostPath");
+        if (string.IsNullOrWhiteSpace(hostPathValue))
+        {
+            continue;
+        }
+
+        var hostPath = Path.GetFullPath(hostPathValue);
+        if (!Directory.Exists(hostPath))
+        {
+            Info($"Source no encontrada, no se monta: {hostPath}");
+            continue;
+        }
+
+        var idValue = TryGetStringProperty(source, "id");
+        var id = string.IsNullOrWhiteSpace(idValue)
+            ? Path.GetFileName(Path.TrimEndingDirectorySeparator(hostPath))
+            : idValue;
+        var containerPath = $"/data/sources/{SanitizeContainerPathSegment(id)}";
+        if (!mountedDestinations.Add(containerPath))
+        {
+            throw new InvalidOperationException($"Source id duplicado para mount: {id}");
+        }
+
+        volumeArgs.Add("-v");
+        volumeArgs.Add($"{hostPath}:{containerPath}:Z");
+    }
+
+    return volumeArgs.ToArray();
+}
+
+static string? TryGetStringProperty(JsonElement element, string propertyName)
+{
+    return TryGetProperty(element, propertyName, out var property)
+        && property.ValueKind == JsonValueKind.String
+        ? property.GetString()
+        : null;
+}
+
+static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement property)
+{
+    foreach (var candidate in element.EnumerateObject())
+    {
+        if (string.Equals(candidate.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+        {
+            property = candidate.Value;
+            return true;
+        }
+    }
+
+    property = default;
+    return false;
+}
+
+static string SanitizeContainerPathSegment(string value)
+{
+    var chars = value
+        .Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' ? ch : '-')
+        .ToArray();
+    var sanitized = new string(chars).Trim('-', '.', '_');
+    return string.IsNullOrWhiteSpace(sanitized) ? "source" : sanitized;
 }
 
 static void Info(string msg)
@@ -155,5 +192,3 @@ static void Silent(string[] args)
     using var p = Process.Start(psi)!;
     p.WaitForExit();
 }
-
-internal sealed record KnowledgeMounts(string[] VolumeArgs, string ContainerRoots);

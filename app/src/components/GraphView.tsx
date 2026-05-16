@@ -27,7 +27,6 @@ export function GraphView() {
   const [loading,     setLoading]     = useState(false)
   const [statusMsg,   setStatusMsg]   = useState('')
   const [mode,        setMode]        = useState<DisplayMode>('list')
-  const [scanPath,    setScanPath]    = useState('')
   const [actionMsg,   setActionMsg]   = useState('')
   const [actionBusy,  setActionBusy]  = useState(false)
   const [repos,       setRepos]       = useState<string[]>([])
@@ -60,31 +59,6 @@ export function GraphView() {
       setStatusMsg('Error al buscar')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const scanRepo = async () => {
-    const path = scanPath.trim()
-    if (!path) return
-    setActionBusy(true)
-    setActionMsg('Escaneando…')
-    try {
-      const data = await fetch('/repos/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directoryPath: path }),
-      }).then(r => r.json())
-      if (data.error) {
-        setActionMsg(`✗ ${data.error}`)
-      } else {
-        setActionMsg(`✓ ${data.repositoryName}: ${data.filesScanned} archivos · ${data.nodesFound} nodos`)
-        setScanPath('')
-        fetchRepos()
-      }
-    } catch {
-      setActionMsg('✗ Error al escanear')
-    } finally {
-      setActionBusy(false)
     }
   }
 
@@ -138,22 +112,8 @@ export function GraphView() {
         </button>
       </div>
 
-      {/* ── Scan toolbar ── */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <input
-          value={scanPath}
-          onChange={e => setScanPath(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && scanRepo()}
-          placeholder="Ruta del repo a escanear…"
-          className="flex-1 min-w-48 bg-gh-surface border border-gh-border rounded px-3 py-1 text-xs
-            text-gh-text outline-none focus:border-gh-accent placeholder-gh-muted"
-        />
-        <button onClick={scanRepo} disabled={actionBusy || !scanPath.trim()}
-          className="text-xs border border-gh-border rounded px-2.5 py-1 text-gh-muted
-            hover:text-gh-text hover:bg-gh-surface disabled:opacity-40 shrink-0 transition-colors"
-        >
-          Escanear
-        </button>
+      {/* ── Actions toolbar ── */}
+      <div className="flex items-center gap-2">
         <button onClick={buildCrossRefs} disabled={actionBusy || repos.length < 2}
           title={repos.length < 2 ? 'Necesitás al menos 2 repos escaneados' : undefined}
           className="text-xs border border-gh-border rounded px-2.5 py-1 text-gh-muted
@@ -327,7 +287,7 @@ function EmptyState() {
       </svg>
       <div>
         <p className="text-gh-muted text-sm">Buscá clases, eventos o servicios a través de tus repos</p>
-        <p className="text-gh-border text-xs mt-1">Escaneá un repo con el campo de arriba, luego buscá</p>
+        <p className="text-gh-border text-xs mt-1">Configurá tus repos en Sources, luego buscá</p>
       </div>
     </div>
   )

@@ -1,13 +1,31 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type APIRequestContext } from '@playwright/test'
+import path from 'path'
+
+const KNOWLEDGE_PATH = path.join(__dirname, '..', 'fixtures', 'knowledge')
+
+async function configureKnowledgeSource(request: APIRequestContext) {
+  await request.put('/sources', {
+    data: {
+      version: 1,
+      sources: [
+        {
+          id: 'knowledge',
+          name: 'knowledge',
+          kind: 'Knowledge',
+          hostPath: KNOWLEDGE_PATH,
+          indexCode: false,
+          indexDocs: true,
+        },
+      ],
+    },
+  })
+  await request.post('/index')
+}
 
 test.describe('Knowledge Search', () => {
-  test.beforeEach(async ({ page }) => {
-    // Escuchar el POST /index antes de navegar (se dispara en mount)
-    const indexDone = page.waitForResponse(
-      res => res.url().endsWith('/index') && res.request().method() === 'POST',
-      { timeout: 15_000 })
+  test.beforeEach(async ({ page, request }) => {
+    await configureKnowledgeSource(request)
     await page.goto('/')
-    await indexDone
   })
 
   test('muestra el input de búsqueda al cargar', async ({ page }) => {

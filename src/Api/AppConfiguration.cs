@@ -40,7 +40,7 @@ internal static class AppConfiguration
                 configuredSources,
                 configuredSources
                     .Where(source => source.IndexDocs)
-                    .Select(source => source.HostPath)
+                    .Select(source => source.GetAccessiblePath())
                     .ToArray());
         }
 

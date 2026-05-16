@@ -16,13 +16,23 @@ public class When_WatcherServiceDetectsChange : IDisposable
         Directory.CreateDirectory(_docsDir);
     }
 
+    private static ISourceConfigurationService BuildSourceConfig(string docsDir)
+    {
+        var sourceDef = SourceDefinition.FromConfiguredSource(
+            ConfiguredSource.Create("docs", "docs", SourceKind.Knowledge, docsDir));
+        var config = new SourceConfigurationFile(1, [sourceDef]);
+        var mock = new Mock<ISourceConfigurationService>();
+        mock.Setup(s => s.GetConfiguration()).Returns(config);
+        return mock.Object;
+    }
+
     [Fact]
     public void Then_LogsAddedEventWithRelativePathWhenFileIsIndexed()
     {
         var filePath = Path.Combine(_docsDir, "guide.md");
         File.WriteAllText(filePath, "# Title\nSome content");
 
-        using (var sut = new WatcherService([_docsDir], _mockDb.Object, _mockLog.Object, new Mock<IFileChangeSource>().Object))
+        using (var sut = new WatcherService(BuildSourceConfig(_docsDir), _mockDb.Object, _mockLog.Object, new Mock<IFileChangeSource>().Object))
         {
             sut.ProcessChange(filePath, "added");
 

@@ -23,17 +23,13 @@ internal sealed class DbService : IDbService, IDisposable
         "ON CONFLICT(path) DO UPDATE SET last_modified=excluded.last_modified";
 
     private readonly SqliteConnection _connection;
-    private readonly IReadOnlyList<string> _roots;
-    private readonly Dictionary<string, string> _rootLabels;
+    private IReadOnlyList<string> _roots;
+    private Dictionary<string, string> _rootLabels;
     private readonly object _connectionLock = new();
 
     public DbService(string dbPath, IReadOnlyList<string> roots)
     {
-        _roots = roots
-            .Select(Path.GetFullPath)
-            .Select(root => root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        _roots = NormalizeRoots(roots);
         _rootLabels = BuildRootLabels(_roots);
         _connection = new SqliteConnection($"Data Source={dbPath}");
         _connection.Open();
@@ -380,6 +376,23 @@ internal sealed class DbService : IDbService, IDisposable
 
         return string.Empty;
     }
+
+    public void UpdateRoots(IReadOnlyList<string> newRoots)
+    {
+        var normalized = NormalizeRoots(newRoots);
+        lock (_connectionLock)
+        {
+            _roots = normalized;
+            _rootLabels = BuildRootLabels(normalized);
+        }
+        IndexDirectories();
+    }
+
+    private static string[] NormalizeRoots(IReadOnlyList<string> roots) =>
+        roots
+            .Select(root => root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
     private static Dictionary<string, string> BuildRootLabels(IReadOnlyList<string> roots)
     {

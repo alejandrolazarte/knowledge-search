@@ -1,12 +1,40 @@
 namespace KnowledgeSearch;
 
 internal sealed class WatcherService(
-    IReadOnlyList<string> roots,
+    ISourceConfigurationService sourceConfiguration,
     IDbService dbService,
     ILogService log,
     IFileChangeSource changeSource) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        var currentRoots = GetAccessibleRoots();
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            using var watchCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var watchTask = RunWatchLoop(currentRoots, watchCts.Token);
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try { await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false); }
+                catch (OperationCanceledException) { break; }
+
+                var newRoots = GetAccessibleRoots();
+                if (!RootsEqual(currentRoots, newRoots))
+                {
+                    currentRoots = newRoots;
+                    await watchCts.CancelAsync().ConfigureAwait(false);
+                    break;
+                }
+            }
+
+            try { await watchTask.ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
+        }
+    }
+
+    private async Task RunWatchLoop(IReadOnlyList<string> roots, CancellationToken cancellationToken)
     {
         try
         {
@@ -55,8 +83,17 @@ internal sealed class WatcherService(
         }
     }
 
+    private string[] GetAccessibleRoots() =>
+        sourceConfiguration.GetConfiguration()
+            .Sources
+            .Select(s => s.ToConfiguredSource())
+            .Where(s => s.IndexDocs)
+            .Select(s => s.GetAccessiblePath())
+            .ToArray();
+
     private string GetRelativePath(string path)
     {
+        var roots = GetAccessibleRoots();
         foreach (var root in roots)
         {
             if (path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
@@ -64,7 +101,13 @@ internal sealed class WatcherService(
                 return Path.GetRelativePath(root, path).Replace('\\', '/');
             }
         }
-
         return path.Replace('\\', '/');
     }
+
+    private static bool RootsEqual(string[] a, string[] b) =>
+        a.Length == b.Length &&
+        a.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .SequenceEqual(
+                b.OrderBy(x => x, StringComparer.OrdinalIgnoreCase),
+                StringComparer.OrdinalIgnoreCase);
 }

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 
 namespace KnowledgeSearch;
@@ -79,7 +80,7 @@ internal sealed record ConfiguredSource(
             id,
             name,
             kind,
-            Path.GetFullPath(hostPath),
+            NormalizeHostPath(hostPath),
             indexCode ?? kind == SourceKind.Repository,
             indexDocs ?? true,
             docIncludes ?? GetDefaultDocIncludes(kind),
@@ -127,6 +128,47 @@ internal sealed record ConfiguredSource(
     {
         var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
         return string.IsNullOrWhiteSpace(name) ? "source" : name;
+    }
+
+    internal static string ToAccessiblePath(string hostPath)
+    {
+        return ToAccessiblePath(CreateId(hostPath), hostPath);
+    }
+
+    internal static string ToAccessiblePath(string id, string hostPath)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            && hostPath.Length >= 2
+            && char.IsLetter(hostPath[0])
+            && hostPath[1] == ':')
+        {
+            return GetContainerSourcePath(id);
+        }
+
+        return hostPath;
+    }
+
+    internal string GetAccessiblePath() => ToAccessiblePath(Id, HostPath);
+
+    internal static string GetContainerSourcePath(string id) =>
+        $"/data/sources/{SanitizeContainerPathSegment(id)}";
+
+    private static string SanitizeContainerPathSegment(string value)
+    {
+        var chars = value
+            .Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' ? ch : '-')
+            .ToArray();
+        var sanitized = new string(chars).Trim('-', '.', '_');
+        return string.IsNullOrWhiteSpace(sanitized) ? "source" : sanitized;
+    }
+
+    private static string NormalizeHostPath(string path)
+    {
+        if (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':')
+        {
+            return path;
+        }
+        return Path.GetFullPath(path);
     }
 
     private static IReadOnlyList<string> GetDefaultDocIncludes(SourceKind kind) =>

@@ -10,11 +10,6 @@ var dbPath = Environment.GetEnvironmentVariable("KNOWLEDGE_DB")
     ?? builder.Configuration["KnowledgeDb"]
     ?? Path.GetFullPath("../knowledge.db");
 
-var sourceConfiguration = AppConfiguration.ResolveSources(
-    builder.Configuration,
-    Environment.GetEnvironmentVariable);
-var roots = sourceConfiguration.KnowledgeRoots;
-
 var skillsDir = Environment.GetEnvironmentVariable("SKILLS_DIR")
     ?? builder.Configuration["SkillsDir"]
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
@@ -26,8 +21,15 @@ var staticDir = Path.GetDirectoryName(indexHtmlPath)!;
 
 var logPath = Path.ChangeExtension(dbPath, ".log");
 
-builder.Services.AddSingleton<ISourceConfigurationService>(_ =>
-    new SourceConfigurationService(builder.Configuration, Environment.GetEnvironmentVariable));
+var sourceConfigService = new SourceConfigurationService(builder.Configuration, Environment.GetEnvironmentVariable);
+builder.Services.AddSingleton<ISourceConfigurationService>(sourceConfigService);
+
+var roots = sourceConfigService.GetConfiguration()
+    .Sources
+    .Select(s => s.ToConfiguredSource())
+    .Where(s => s.IndexDocs)
+    .Select(s => s.GetAccessiblePath())
+    .ToList();
 
 var dbService = new DbService(dbPath, roots);
 builder.Services.AddSingleton<IDbService>(dbService);
@@ -47,7 +49,7 @@ else
 
 builder.Services.AddHostedService(serviceProvider =>
     new WatcherService(
-        roots,
+        serviceProvider.GetRequiredService<ISourceConfigurationService>(),
         serviceProvider.GetRequiredService<IDbService>(),
         serviceProvider.GetRequiredService<ILogService>(),
         serviceProvider.GetRequiredService<IFileChangeSource>()));

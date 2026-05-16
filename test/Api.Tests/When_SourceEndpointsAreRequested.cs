@@ -19,24 +19,19 @@ public class When_SourceEndpointsAreRequested : IDisposable
     }
 
     [Fact]
-    public async Task Then_GetSourcesReturnsFallbackConfiguration()
+    public async Task Then_GetSourcesReturnsEmptyWhenNoFileExists()
     {
-        var docsDir = Directory.CreateDirectory(Path.Combine(_tempDir, "docs")).FullName;
         using var app = CreateApp(new Dictionary<string, string?>
         {
             ["SourcesConfig"] = Path.Combine(_tempDir, "data", "sources.json"),
-            ["KnowledgeDirs"] = docsDir,
         });
         var client = app.CreateClient();
 
         var response = await client.GetFromJsonAsync<SourceConfigurationFile>("/sources");
 
         response.ShouldNotBeNull();
-        response.Sources.Count.ShouldBe(1);
-        response.Sources[0].Kind.ShouldBe(SourceKind.Knowledge);
-        response.Sources[0].HostPath.ShouldBe(Path.GetFullPath(docsDir));
-        response.Sources[0].IndexDocs.ShouldBe(true);
-        response.Sources[0].IndexCode.ShouldBe(false);
+        response.Sources.Count.ShouldBe(0);
+        response.Version.ShouldBe(1);
     }
 
     [Fact]
@@ -90,20 +85,18 @@ public class When_SourceEndpointsAreRequested : IDisposable
     }
 
     [Fact]
-    public async Task Then_ExportReturnsGeneratedFallbackWhenFileDoesNotExist()
+    public async Task Then_ExportReturnsEmptyConfigWhenFileDoesNotExist()
     {
-        var docsDir = Directory.CreateDirectory(Path.Combine(_tempDir, "docs")).FullName;
         using var app = CreateApp(new Dictionary<string, string?>
         {
             ["SourcesConfig"] = Path.Combine(_tempDir, "missing", "sources.json"),
-            ["KnowledgeDirs"] = docsDir,
         });
         var client = app.CreateClient();
 
         var exported = await client.GetStringAsync("/sources/export");
 
         exported.ShouldContain("\"version\"");
-        exported.ShouldContain("docs");
+        exported.ShouldContain("\"sources\"");
     }
 
     [Fact]

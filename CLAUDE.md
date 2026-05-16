@@ -27,14 +27,13 @@ data/                  ← SQLite DB + log (no va en la imagen)
 
 Toda ejecución y compilación ocurre dentro de un contenedor Podman. Nunca ejecutar `dotnet run`, `dotnet watch run`, `pnpm install`, `pnpm run build` ni `pnpm run dev` directamente en el host. Si el usuario lo pide explícitamente, pedirle confirmación antes de proceder.
 
-## Variables de entorno requeridas
-
-Los scripts no tienen paths hardcodeados. Antes de usarlos:
+## Variables de entorno opcionales
 
 ```powershell
-$env:KNOWLEDGE_DIRS = "C:\ruta\a\tu\knowledge"  # requerido; multiples roots separados por ;
-$env:SKILLS_DIR    = "~\.claude\skills"          # opcional
+$env:SKILLS_DIR = "~\.claude\skills"   # opcional; default: ~/.claude/skills
 ```
+
+Las fuentes de conocimiento se configuran desde la UI de Sources (no se requieren variables de entorno). Los scripts leen `data/sources.json` y montan los drives necesarios automáticamente.
 
 ## Uso productivo (sin tocar código)
 
@@ -101,6 +100,5 @@ dotnet build src/Api/Api.csproj --no-restore
 | Variable | Default | Descripción |
 |---|---|---|
 | `KNOWLEDGE_DB` | `../knowledge.db` | Path a la base SQLite |
-| `KNOWLEDGE_DIRS` | `../knowledge` | Roots de docs Markdown (`;` separados) |
-| `REPO_DIRS` | — | Roots de repositorios de código (`;` separados) |
+| `SOURCES_CONFIG` | `<base>/data/sources.json` | Path al archivo de fuentes (seteado por los scripts) |
 | `SKILLS_DIR` | `~/.claude/skills` | Directorio de skills de Claude Code |
