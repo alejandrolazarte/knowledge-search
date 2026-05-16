@@ -5,11 +5,12 @@ import { SkillsView } from './components/SkillsView'
 import { FilePanel }  from './components/FilePanel'
 import { GraphView }  from './components/GraphView'
 import { RepoSearchView } from './components/RepoSearchView'
+import { SourcesView }  from './components/SourcesView'
 import { useTheme }    from './hooks/useTheme'
 import { useFontSize } from './hooks/useFontSize'
 import type { Skill } from './types'
 
-type View = 'search' | 'repo-search' | 'skills' | 'graph'
+type View = 'search' | 'repo-search' | 'skills' | 'graph' | 'sources'
 
 interface ActiveFile {
   path:     string
@@ -79,7 +80,11 @@ export function App() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="h-10 border-b border-gh-border flex items-center px-4 gap-3 shrink-0">
           <span className="text-sm font-medium">
-            {view === 'search' ? 'Knowledge Search' : view === 'repo-search' ? 'Repo Search' : view === 'skills' ? 'Skills' : 'Code Graph'}
+            {view === 'search' ? 'Knowledge Search'
+              : view === 'repo-search' ? 'Repo Search'
+              : view === 'skills' ? 'Skills'
+              : view === 'graph' ? 'Code Graph'
+              : 'Sources'}
           </span>
           <div className="flex-1" />
           {view === 'search' && (
@@ -109,6 +114,9 @@ export function App() {
         )}
         {view === 'graph' && (
           <GraphView />
+        )}
+        {view === 'sources' && (
+          <SourcesView />
         )}
       </div>
 

@@ -19,6 +19,8 @@ public record LogEvent(
 [JsonSerializable(typeof(List<string>))]
 [JsonSerializable(typeof(SourceConfigurationFile))]
 [JsonSerializable(typeof(SourceDefinition))]
+[JsonSerializable(typeof(List<SourceDefinition>))]
+[JsonSerializable(typeof(SaveSourcesResult))]
 [JsonSerializable(typeof(ConfiguredSource))]
 [JsonSerializable(typeof(List<ConfiguredSource>))]
 [JsonSerializable(typeof(LogEvent))]

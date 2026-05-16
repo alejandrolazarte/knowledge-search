@@ -1,3 +1,22 @@
+export type SourceKind = 'Knowledge' | 'Repository'
+
+export interface SourceDefinition {
+  id:           string
+  name:         string
+  kind:         SourceKind
+  hostPath:     string
+  indexCode:    boolean
+  indexDocs:    boolean
+  docIncludes:  string[]
+  codeIncludes: string[]
+  excludes:     string[]
+}
+
+export interface SourceConfigurationFile {
+  version: number
+  sources: SourceDefinition[]
+}
+
 export interface SearchResult {
   title:   string
   section: string
