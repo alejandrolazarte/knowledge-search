@@ -358,8 +358,8 @@ internal static class AppConfig
 
         var dbPath    = Environment.GetEnvironmentVariable("KNOWLEDGE_DB")
                      ?? Cfg("KnowledgeDb",  Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "knowledge.db")));
-        var docsDir   = Environment.GetEnvironmentVariable("KNOWLEDGE_DIR")
-                     ?? Cfg("KnowledgeDir", Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "knowledge")));
+        var docsDir   = Environment.GetEnvironmentVariable("KNOWLEDGE_DIRS")
+                     ?? Cfg("KnowledgeDirs", Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "knowledge")));
         var skillsDir = Environment.GetEnvironmentVariable("SKILLS_DIR")
                      ?? Cfg("SkillsDir",    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills"));
 

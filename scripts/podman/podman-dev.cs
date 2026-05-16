@@ -10,7 +10,7 @@
 //   (sin flags)        arranca dotnet watch con hot reload de .cs
 //
 // Variables de entorno requeridas:
-//   KNOWLEDGE_DIR   path a la carpeta con los archivos .md de knowledge
+//   KNOWLEDGE_DIRS  path(s) a carpetas con archivos .md de knowledge, separados por ;
 //
 // Variables de entorno opcionales:
 //   SKILLS_DIR      path a los skills de Claude (default: ~/.claude/skills)
@@ -23,8 +23,9 @@ var buildFrontend = args.Contains("--build-frontend");
 
 var root      = FindRoot();
 var dataDir   = Path.Combine(root, "data");
-var knowledge = RequireEnv("KNOWLEDGE_DIR",
-    "Ejemplo: $env:KNOWLEDGE_DIR = 'D:\\mis-docs\\knowledge'");
+var knowledgeRoots = RequireEnv("KNOWLEDGE_DIRS",
+    "Ejemplo: $env:KNOWLEDGE_DIRS = 'D:\\mis-docs\\knowledge'");
+var knowledgeMounts = BuildKnowledgeMounts(knowledgeRoots);
 var skills    = Environment.GetEnvironmentVariable("SKILLS_DIR")
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
 
@@ -37,8 +38,9 @@ string[] baseVols =
     "-v", $"{root}:/workspace:Z",
     "-v", $"{NodeVolume}:/workspace/app/node_modules",
     "-v", $"{dataDir}:/data/db:Z",
-    "-v", $"{knowledge}:/data/knowledge:Z",
+    ..knowledgeMounts.VolumeArgs,
     "-v", $"{skills}:/data/skills:Z",
+    "-e", $"KNOWLEDGE_DIRS={knowledgeMounts.ContainerRoots}",
 ];
 
 if (build)
@@ -96,6 +98,35 @@ static string RequireEnv(string name, string hint)
     return null!;
 }
 
+static KnowledgeMounts BuildKnowledgeMounts(string configuredRoots)
+{
+    var hostRoots = configuredRoots
+        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(Path.GetFullPath)
+        .ToArray();
+
+    if (hostRoots.Length == 0)
+    {
+        throw new InvalidOperationException("KNOWLEDGE_DIRS no contiene roots válidos.");
+    }
+
+    var volumeArgs = new List<string>();
+    var containerRoots = new List<string>();
+
+    for (var i = 0; i < hostRoots.Length; i++)
+    {
+        var containerRoot = hostRoots.Length == 1
+            ? "/data/knowledge"
+            : $"/data/knowledge/root{i + 1}";
+
+        volumeArgs.Add("-v");
+        volumeArgs.Add($"{hostRoots[i]}:{containerRoot}:Z");
+        containerRoots.Add(containerRoot);
+    }
+
+    return new KnowledgeMounts(volumeArgs.ToArray(), string.Join(';', containerRoots));
+}
+
 static void Info(string msg)
 {
     Console.ForegroundColor = ConsoleColor.Cyan;
@@ -124,3 +155,5 @@ static void Silent(string[] args)
     using var p = Process.Start(psi)!;
     p.WaitForExit();
 }
+
+internal sealed record KnowledgeMounts(string[] VolumeArgs, string ContainerRoots);

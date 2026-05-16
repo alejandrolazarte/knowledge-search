@@ -14,7 +14,7 @@ No se necesita Node.js en el host. Todo lo demás compila y corre dentro del con
 Los scripts no contienen paths personales. Definí estas variables en tu perfil de PowerShell (`$PROFILE`):
 
 ```powershell
-$env:KNOWLEDGE_DIR = "C:\ruta\a\tu\carpeta\knowledge"   # requerido
+$env:KNOWLEDGE_DIRS = "C:\ruta\a\tu\carpeta\knowledge"  # requerido; varios roots separados por ;
 $env:SKILLS_DIR    = "C:\Users\<tu-user>\.claude\skills" # opcional, se infiere por defecto
 ```
 
@@ -69,7 +69,7 @@ Abre `http://localhost:5112`.
 | Host | Contenedor | Contenido |
 |---|---|---|
 | `knowledge-search/data/` | `/data/db` | SQLite DB + log |
-| `$env:KNOWLEDGE_DIR` | `/data/knowledge` | Docs Markdown |
+| `$env:KNOWLEDGE_DIRS` | `/data/knowledge` o `/data/knowledge/rootN` | Docs Markdown; uno o varios paths separados por `;` |
 | `$env:SKILLS_DIR` (o `~/.claude/skills`) | `/data/skills` | Skills de Claude Code |
 
 ## Variables de entorno
@@ -77,7 +77,7 @@ Abre `http://localhost:5112`.
 | Variable | Valor en contenedor | Default local |
 |---|---|---|
 | `KNOWLEDGE_DB` | `/data/db/knowledge.db` | `../knowledge.db` |
-| `KNOWLEDGE_DIR` | `/data/knowledge` | `../knowledge` |
+| `KNOWLEDGE_DIRS` | `/data/knowledge` | `../knowledge`; acepta uno o varios roots separados por `;` |
 | `SKILLS_DIR` | `/data/skills` | `~/.claude/skills` |
 
 ## API REST

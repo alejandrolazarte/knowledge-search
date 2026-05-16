@@ -18,7 +18,7 @@
 | `src/Api/Persistence/IDbService.cs` | Create | Interface: Search, IndexDirectories, IsPathAllowed, ReindexFile, DeleteFile, GetRootNames |
 | `src/Api/Persistence/DbService.cs` | Rewrite | Instance class: connection singleton, BuildFtsQuery, transactions, all IDbService methods |
 | `src/Api/Program.cs` | Rewrite | IConfiguration, DI registration, global exception middleware |
-| `src/Api/appsettings.json` | Modify | Rename `KnowledgeDir` → `KnowledgeDirs` |
+| `src/Api/appsettings.json` | Modify | Use `KnowledgeDirs` for one or more roots |
 | `src/Api/AppConfig.cs` | Delete | Replaced by IConfiguration in Program.cs |
 | `src/Api/Endpoints/SearchEndpoints.cs` | Rewrite | Use IDbService from DI, add `modes`/`roots` params, add `/roots` endpoint |
 | `src/Api/Services/WatcherService.cs` | Rewrite | Multiple roots, use IDbService |
@@ -668,7 +668,7 @@ git commit -m "test: add When_DbServiceSearches"
 - Modify: `src/Api/appsettings.json`
 - Delete: `src/Api/AppConfig.cs`
 
-- [ ] **Step 1: Update `appsettings.json`** — rename `KnowledgeDir` → `KnowledgeDirs`
+- [ ] **Step 1: Update `appsettings.json`** — use `KnowledgeDirs`
 
 ```json
 {
@@ -678,7 +678,7 @@ git commit -m "test: add When_DbServiceSearches"
 }
 ```
 
-(To support multiple roots later: `"KnowledgeDirs": "D:/Documentation;D:/work/repos"`)
+Example with multiple roots: `"KnowledgeDirs": "D:/Documentation;D:/work/repos"`
 
 - [ ] **Step 2: Rewrite `Program.cs`**
 
