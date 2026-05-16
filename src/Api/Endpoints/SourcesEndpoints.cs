@@ -7,7 +7,11 @@ internal static class SourcesEndpoints
         app.MapGet("/sources", (ISourceConfigurationService sources) =>
             Results.Ok(sources.GetConfiguration()));
 
-        app.MapPut("/sources", (SourceConfigurationFile request, ISourceConfigurationService sources, IDbService dbService) =>
+        app.MapPut("/sources", (
+            SourceConfigurationFile request,
+            ISourceConfigurationService sources,
+            IDbService dbService,
+            ICodeGraphService codeGraphService) =>
         {
             var result = sources.Save(request);
             if (!result.Success)
@@ -16,13 +20,25 @@ internal static class SourcesEndpoints
             }
 
             var savedConfig = sources.GetConfiguration();
-            var newRoots = savedConfig.Sources
+            var configuredSources = savedConfig.Sources
                 .Select(s => s.ToConfiguredSource())
+                .ToArray();
+
+            var docRoots = configuredSources
                 .Where(s => s.IndexDocs)
                 .Select(s => ConfiguredSource.ToAccessiblePath(s.HostPath))
                 .ToArray();
 
-            dbService.UpdateRoots(newRoots);
+            dbService.UpdateRoots(docRoots);
+
+            foreach (var source in configuredSources.Where(s => s.IndexCode))
+            {
+                var accessiblePath = ConfiguredSource.ToAccessiblePath(source.HostPath);
+                if (Directory.Exists(accessiblePath))
+                {
+                    codeGraphService.ScanDirectory(accessiblePath);
+                }
+            }
 
             return Results.Ok(savedConfig);
         });
