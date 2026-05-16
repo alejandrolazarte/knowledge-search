@@ -128,8 +128,8 @@ internal static class SearchEndpoints
             return Results.File(File.ReadAllBytes(fullPath), contentType);
         });
 
-        app.MapGet("/roots", (IDbService dbService) =>
-            Results.Ok(dbService.GetRootNames()));
+        app.MapGet("/roots", (ISourceConfigurationService sources) =>
+            Results.Ok(sources.GetKnowledgeRootNames()));
 
         app.MapGet("/health", () => Results.Ok(new HealthResult("ok")));
     }

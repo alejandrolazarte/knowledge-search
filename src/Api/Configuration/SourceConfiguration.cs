@@ -37,6 +37,20 @@ internal sealed record SourceDefinition(
             CodeIncludes is { Count: > 0 } ? CodeIncludes : null,
             Excludes is { Count: > 0 } ? Excludes : null);
     }
+
+    public static SourceDefinition FromConfiguredSource(ConfiguredSource source)
+    {
+        return new SourceDefinition(
+            source.Id,
+            source.Name,
+            source.Kind,
+            source.HostPath,
+            source.IndexCode,
+            source.IndexDocs,
+            source.DocIncludes,
+            source.CodeIncludes,
+            source.Excludes);
+    }
 }
 
 internal sealed record ConfiguredSource(
