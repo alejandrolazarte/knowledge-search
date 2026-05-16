@@ -10,16 +10,9 @@ var dbPath = Environment.GetEnvironmentVariable("KNOWLEDGE_DB")
     ?? builder.Configuration["KnowledgeDb"]
     ?? Path.GetFullPath("../knowledge.db");
 
-var configuredRoots = Environment.GetEnvironmentVariable("KNOWLEDGE_DIRS")
-    ?? builder.Configuration["KnowledgeDirs"]
-    ?? Environment.GetEnvironmentVariable("KNOWLEDGE_DIR")
-    ?? builder.Configuration["KnowledgeDir"]
-    ?? Path.GetFullPath("../knowledge");
-
-var roots = configuredRoots
-    .Split(';', StringSplitOptions.RemoveEmptyEntries)
-    .Select(Path.GetFullPath)
-    .ToArray();
+var roots = AppConfiguration.ResolveKnowledgeRoots(
+    builder.Configuration,
+    Environment.GetEnvironmentVariable);
 
 var skillsDir = Environment.GetEnvironmentVariable("SKILLS_DIR")
     ?? builder.Configuration["SkillsDir"]

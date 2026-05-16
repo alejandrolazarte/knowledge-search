@@ -32,7 +32,7 @@ Toda ejecución y compilación ocurre dentro de un contenedor Podman. Nunca ejec
 Los scripts no tienen paths hardcodeados. Antes de usarlos:
 
 ```powershell
-$env:KNOWLEDGE_DIR = "C:\ruta\a\tu\knowledge"   # requerido
+$env:KNOWLEDGE_DIRS = "C:\ruta\a\tu\knowledge"  # requerido; multiples roots separados por ;
 $env:SKILLS_DIR    = "~\.claude\skills"          # opcional
 ```
 

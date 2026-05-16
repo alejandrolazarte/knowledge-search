@@ -27,7 +27,7 @@ EXPOSE 5111
 ENV ASPNETCORE_URLS=http://+:5111
 ENV FILE_WATCHER=polling
 ENV KNOWLEDGE_DB=/data/db/knowledge.db
-ENV KNOWLEDGE_DIR=/data/knowledge
+ENV KNOWLEDGE_DIRS=/data/knowledge
 ENV SKILLS_DIR=/data/skills
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \

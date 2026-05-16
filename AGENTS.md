@@ -35,7 +35,7 @@ All execution and compilation happens inside a Podman container. Never run `dotn
 Scripts contain no personal paths. Set these before use:
 
 ```powershell
-$env:KNOWLEDGE_DIR = "C:\path\to\your\knowledge"   # required
+$env:KNOWLEDGE_DIRS = "C:\path\to\your\knowledge"  # required; multiple roots separated by ;
 $env:SKILLS_DIR    = "~\.claude\skills"             # optional, inferred by default
 ```
 
