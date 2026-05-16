@@ -14,7 +14,7 @@
 //   SKILLS_DIR  path a los skills de Claude (default: ~/.claude/skills)
 
 using System.Diagnostics;
-using System.Text.RegularExpressions;
+using System.Text.Json;
 
 var build         = args.Contains("--build");
 var installDeps   = args.Contains("--install-deps");
@@ -22,7 +22,7 @@ var buildFrontend = args.Contains("--build-frontend");
 
 var root      = FindRoot();
 var dataDir   = Path.Combine(root, "data");
-var driveMounts = BuildDriveMounts(dataDir);
+var sourceMounts = BuildSourceMounts(dataDir);
 var skills    = Environment.GetEnvironmentVariable("SKILLS_DIR")
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
 
@@ -35,7 +35,7 @@ string[] baseVols =
     "-v", $"{root}:/workspace:Z",
     "-v", $"{NodeVolume}:/workspace/app/node_modules",
     "-v", $"{dataDir}:/data/db:Z",
-    ..driveMounts,
+    ..sourceMounts,
     "-v", $"{skills}:/data/skills:Z",
     "-e", "SOURCES_CONFIG=/data/db/sources.json",
 ];
@@ -83,7 +83,7 @@ static string FindRoot()
     throw new InvalidOperationException("Project root no encontrado (buscando Containerfile).");
 }
 
-static string[] BuildDriveMounts(string dataDir)
+static string[] BuildSourceMounts(string dataDir)
 {
     var sourcesJson = Path.Combine(dataDir, "sources.json");
     if (!File.Exists(sourcesJson))
@@ -91,21 +91,77 @@ static string[] BuildDriveMounts(string dataDir)
         return [];
     }
 
-    var json = File.ReadAllText(sourcesJson);
-    var driveLetters = Regex.Matches(json, @"""hostPath""\s*:\s*""([A-Za-z]):\\")
-        .Select(m => char.ToLowerInvariant(m.Groups[1].Value[0]))
-        .Distinct()
-        .ToArray();
-
     var volumeArgs = new List<string>();
-    foreach (var drive in driveLetters)
+    var mountedDestinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    using var document = JsonDocument.Parse(File.ReadAllText(sourcesJson));
+    if (!TryGetProperty(document.RootElement, "sources", out var sourcesElement)
+        || sourcesElement.ValueKind != JsonValueKind.Array)
     {
-        var hostDrive = $"{char.ToUpperInvariant(drive)}:\\";
+        return [];
+    }
+
+    foreach (var source in sourcesElement.EnumerateArray())
+    {
+        var hostPathValue = TryGetStringProperty(source, "hostPath");
+        if (string.IsNullOrWhiteSpace(hostPathValue))
+        {
+            continue;
+        }
+
+        var hostPath = Path.GetFullPath(hostPathValue);
+        if (!Directory.Exists(hostPath))
+        {
+            Info($"Source no encontrada, no se monta: {hostPath}");
+            continue;
+        }
+
+        var idValue = TryGetStringProperty(source, "id");
+        var id = string.IsNullOrWhiteSpace(idValue)
+            ? Path.GetFileName(Path.TrimEndingDirectorySeparator(hostPath))
+            : idValue;
+        var containerPath = $"/data/sources/{SanitizeContainerPathSegment(id)}";
+        if (!mountedDestinations.Add(containerPath))
+        {
+            throw new InvalidOperationException($"Source id duplicado para mount: {id}");
+        }
+
         volumeArgs.Add("-v");
-        volumeArgs.Add($"{hostDrive}:/mnt/{drive}:Z");
+        volumeArgs.Add($"{hostPath}:{containerPath}:Z");
     }
 
     return volumeArgs.ToArray();
+}
+
+static string? TryGetStringProperty(JsonElement element, string propertyName)
+{
+    return TryGetProperty(element, propertyName, out var property)
+        && property.ValueKind == JsonValueKind.String
+        ? property.GetString()
+        : null;
+}
+
+static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement property)
+{
+    foreach (var candidate in element.EnumerateObject())
+    {
+        if (string.Equals(candidate.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+        {
+            property = candidate.Value;
+            return true;
+        }
+    }
+
+    property = default;
+    return false;
+}
+
+static string SanitizeContainerPathSegment(string value)
+{
+    var chars = value
+        .Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' ? ch : '-')
+        .ToArray();
+    var sanitized = new string(chars).Trim('-', '.', '_');
+    return string.IsNullOrWhiteSpace(sanitized) ? "source" : sanitized;
 }
 
 static void Info(string msg)

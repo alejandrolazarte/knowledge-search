@@ -132,17 +132,34 @@ internal sealed record ConfiguredSource(
 
     internal static string ToAccessiblePath(string hostPath)
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        return ToAccessiblePath(CreateId(hostPath), hostPath);
+    }
+
+    internal static string ToAccessiblePath(string id, string hostPath)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            && hostPath.Length >= 2
+            && char.IsLetter(hostPath[0])
+            && hostPath[1] == ':')
         {
-            return hostPath;
+            return GetContainerSourcePath(id);
         }
-        if (hostPath.Length >= 2 && char.IsLetter(hostPath[0]) && hostPath[1] == ':')
-        {
-            var drive = char.ToLowerInvariant(hostPath[0]);
-            var rest = hostPath[2..].Replace('\\', '/').TrimStart('/');
-            return $"/mnt/{drive}/{rest}";
-        }
+
         return hostPath;
+    }
+
+    internal string GetAccessiblePath() => ToAccessiblePath(Id, HostPath);
+
+    internal static string GetContainerSourcePath(string id) =>
+        $"/data/sources/{SanitizeContainerPathSegment(id)}";
+
+    private static string SanitizeContainerPathSegment(string value)
+    {
+        var chars = value
+            .Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' ? ch : '-')
+            .ToArray();
+        var sanitized = new string(chars).Trim('-', '.', '_');
+        return string.IsNullOrWhiteSpace(sanitized) ? "source" : sanitized;
     }
 
     private static string NormalizeHostPath(string path)

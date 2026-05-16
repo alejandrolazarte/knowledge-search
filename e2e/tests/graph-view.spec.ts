@@ -4,16 +4,38 @@ import path from 'path'
 const USERS_MS_PATH        = path.join(__dirname, '..', 'fixtures', 'repos', 'users-ms')
 const NOTIFICATIONS_MS_PATH = path.join(__dirname, '..', 'fixtures', 'repos', 'notifications-ms')
 
+async function configureRepositorySources(page: Page) {
+  const response = await page.request.put('/sources', {
+    data: {
+      version: 1,
+      sources: [
+        {
+          id: 'users-ms',
+          name: 'users-ms',
+          kind: 'Repository',
+          hostPath: USERS_MS_PATH,
+          indexCode: true,
+          indexDocs: false,
+        },
+        {
+          id: 'notifications-ms',
+          name: 'notifications-ms',
+          kind: 'Repository',
+          hostPath: NOTIFICATIONS_MS_PATH,
+          indexCode: true,
+          indexDocs: false,
+        },
+      ],
+    },
+  })
+  expect(response.ok()).toBeTruthy()
+}
+
 async function navigateToGraphView(page: Page) {
+  await configureRepositorySources(page)
   await page.goto('/')
   await page.getByRole('button', { name: /Code Graph/i }).click()
   await expect(page.getByPlaceholder(/Buscar en repos/i)).toBeVisible()
-}
-
-async function scanRepo(page: Page, repoPath: string) {
-  await page.getByPlaceholder(/Ruta del repo/i).fill(repoPath)
-  await page.getByRole('button', { name: /^Escanear$/i }).click()
-  await expect(page.getByText(/archivos/i)).toBeVisible({ timeout: 15_000 })
 }
 
 test.describe('Code Graph — vista lista', () => {
@@ -28,15 +50,10 @@ test.describe('Code Graph — vista lista', () => {
   })
 
   test('escanea users-ms y muestra el repo en los chips', async ({ page }) => {
-    await scanRepo(page, USERS_MS_PATH)
-
     await expect(page.getByRole('button', { name: 'users-ms' })).toBeVisible()
   })
 
   test('escanea ambos repos y busca nodos de IntegrationEvent', async ({ page }) => {
-    await scanRepo(page, USERS_MS_PATH)
-    await scanRepo(page, NOTIFICATIONS_MS_PATH)
-
     await page.getByPlaceholder(/Buscar en repos/i).fill('IntegrationEvent')
     await page.keyboard.press('Enter')
 
@@ -45,9 +62,6 @@ test.describe('Code Graph — vista lista', () => {
   })
 
   test('agrupa los nodos por repositorio', async ({ page }) => {
-    await scanRepo(page, USERS_MS_PATH)
-    await scanRepo(page, NOTIFICATIONS_MS_PATH)
-
     await page.getByPlaceholder(/Buscar en repos/i).fill('IntegrationEvent')
     await page.keyboard.press('Enter')
 
@@ -56,21 +70,16 @@ test.describe('Code Graph — vista lista', () => {
   })
 
   test('muestra conexiones cross-repo después de build cross-refs', async ({ page }) => {
-    await scanRepo(page, USERS_MS_PATH)
-    await scanRepo(page, NOTIFICATIONS_MS_PATH)
-
     await page.getByRole('button', { name: /Build cross-refs/i }).click()
     await expect(page.getByText(/conexiones cross-repo encontradas/i)).toBeVisible({ timeout: 10_000 })
 
     await page.getByPlaceholder(/Buscar en repos/i).fill('IntegrationEvent')
     await page.keyboard.press('Enter')
 
-    await expect(page.getByText(/Conexiones cross-repo/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/^Conexiones cross-repo \(\d+\)$/i)).toBeVisible({ timeout: 10_000 })
   })
 
   test('retorna sin resultados para término inexistente', async ({ page }) => {
-    await scanRepo(page, USERS_MS_PATH)
-
     await page.getByPlaceholder(/Buscar en repos/i).fill('XyzClaseQueNoExiste999')
     await page.keyboard.press('Enter')
 
@@ -81,8 +90,6 @@ test.describe('Code Graph — vista lista', () => {
 test.describe('Code Graph — vista grafo SVG', () => {
   test('renderiza nodos SVG al cambiar a vista Grafo', async ({ page }) => {
     await navigateToGraphView(page)
-    await scanRepo(page, USERS_MS_PATH)
-    await scanRepo(page, NOTIFICATIONS_MS_PATH)
 
     await page.getByPlaceholder(/Buscar en repos/i).fill('IntegrationEvent')
     await page.keyboard.press('Enter')

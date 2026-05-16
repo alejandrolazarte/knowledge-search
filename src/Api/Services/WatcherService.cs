@@ -88,7 +88,7 @@ internal sealed class WatcherService(
             .Sources
             .Select(s => s.ToConfiguredSource())
             .Where(s => s.IndexDocs)
-            .Select(s => ConfiguredSource.ToAccessiblePath(s.HostPath))
+            .Select(s => s.GetAccessiblePath())
             .ToArray();
 
     private string GetRelativePath(string path)

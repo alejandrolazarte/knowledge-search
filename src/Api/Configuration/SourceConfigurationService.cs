@@ -11,6 +11,7 @@ internal sealed class SourceConfigurationService(
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
     };
 
@@ -37,7 +38,7 @@ internal sealed class SourceConfigurationService(
             .Where(source => source.IndexDocs)
             .Select(source => Path.GetFileName(
                 Path.TrimEndingDirectorySeparator(
-                    ConfiguredSource.ToAccessiblePath(source.HostPath))))
+                    source.GetAccessiblePath())))
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .ToArray();
     }

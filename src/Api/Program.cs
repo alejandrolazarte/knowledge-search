@@ -28,7 +28,7 @@ var roots = sourceConfigService.GetConfiguration()
     .Sources
     .Select(s => s.ToConfiguredSource())
     .Where(s => s.IndexDocs)
-    .Select(s => ConfiguredSource.ToAccessiblePath(s.HostPath))
+    .Select(s => s.GetAccessiblePath())
     .ToList();
 
 var dbService = new DbService(dbPath, roots);

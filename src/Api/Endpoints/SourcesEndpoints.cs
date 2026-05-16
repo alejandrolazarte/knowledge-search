@@ -26,14 +26,14 @@ internal static class SourcesEndpoints
 
             var docRoots = configuredSources
                 .Where(s => s.IndexDocs)
-                .Select(s => ConfiguredSource.ToAccessiblePath(s.HostPath))
+                .Select(s => s.GetAccessiblePath())
                 .ToArray();
 
             dbService.UpdateRoots(docRoots);
 
             foreach (var source in configuredSources.Where(s => s.IndexCode))
             {
-                var accessiblePath = ConfiguredSource.ToAccessiblePath(source.HostPath);
+                var accessiblePath = source.GetAccessiblePath();
                 if (Directory.Exists(accessiblePath))
                 {
                     codeGraphService.ScanDirectory(accessiblePath);

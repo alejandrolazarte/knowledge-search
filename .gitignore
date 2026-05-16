@@ -33,6 +33,7 @@ e2e/test-results/
 e2e/test.db
 e2e/test.db-wal
 e2e/test.db-shm
+e2e/sources.json
 
 # Local Claude instructions (no publicar)
 CLAUDE.local.md
