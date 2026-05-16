@@ -1,3 +1,5 @@
+using KnowledgeSearch.Core.Domain.Sources;
+
 namespace KnowledgeSearch;
 
 internal sealed class WatcherService(

@@ -1,4 +1,10 @@
 using KnowledgeSearch;
+using KnowledgeSearch.Core.Abstractions.CodeGraph;
+using KnowledgeSearch.Core.Abstractions.Files;
+using KnowledgeSearch.Core.Abstractions.Search;
+using KnowledgeSearch.Core.Abstractions.Sources;
+using KnowledgeSearch.Core.Domain.Sources;
+using KnowledgeSearch.Core.UseCases.Sources;
 using Microsoft.AspNetCore.Diagnostics;
 
 var builder = WebApplication.CreateSlimBuilder(args);
@@ -23,6 +29,7 @@ var logPath = Path.ChangeExtension(dbPath, ".log");
 
 var sourceConfigService = new SourceConfigurationService(builder.Configuration, Environment.GetEnvironmentVariable);
 builder.Services.AddSingleton<ISourceConfigurationService>(sourceConfigService);
+builder.Services.AddSingleton<ISourceConfigurationStore>(sourceConfigService);
 
 var roots = sourceConfigService.GetConfiguration()
     .Sources
@@ -33,6 +40,7 @@ var roots = sourceConfigService.GetConfiguration()
 
 var dbService = new DbService(dbPath, roots);
 builder.Services.AddSingleton<IDbService>(dbService);
+builder.Services.AddSingleton<IDocumentIndex>(dbService);
 builder.Services.AddSingleton<ILogService>(new LogService(logPath));
 var fileWatcherMode = Environment.GetEnvironmentVariable("FILE_WATCHER")
     ?? builder.Configuration["FileWatcher"]
@@ -62,6 +70,11 @@ foreach (var typeScriptExtension in new[] { ".ts", ".tsx", ".js", ".jsx", ".mjs"
 }
 builder.Services.AddKeyedSingleton<ISourceFileParser, PythonParser>(".py");
 builder.Services.AddSingleton<ICodeGraphService, CodeGraphService>();
+builder.Services.AddSingleton<ICodeGraphScanner, CodeGraphScannerAdapter>();
+builder.Services.AddSingleton<IFileSystem, FileSystemAdapter>();
+builder.Services.AddSingleton<GetSourcesUseCase>();
+builder.Services.AddSingleton<SaveSourcesUseCase>();
+builder.Services.AddSingleton<ExportSourcesUseCase>();
 
 var app = builder.Build();
 var logger = app.Logger;

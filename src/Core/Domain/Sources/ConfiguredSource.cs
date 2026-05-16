@@ -1,60 +1,8 @@
 using System.Runtime.InteropServices;
-using System.Text.Json.Serialization;
 
-namespace KnowledgeSearch;
+namespace KnowledgeSearch.Core.Domain.Sources;
 
-[JsonConverter(typeof(JsonStringEnumConverter<SourceKind>))]
-internal enum SourceKind
-{
-    Knowledge,
-    Repository,
-}
-
-internal sealed record SourceConfigurationFile(
-    int Version,
-    IReadOnlyList<SourceDefinition> Sources);
-
-internal sealed record SourceDefinition(
-    string Id,
-    string Name,
-    SourceKind Kind,
-    string HostPath,
-    bool? IndexCode,
-    bool? IndexDocs,
-    IReadOnlyList<string>? DocIncludes,
-    IReadOnlyList<string>? CodeIncludes,
-    IReadOnlyList<string>? Excludes)
-{
-    public ConfiguredSource ToConfiguredSource()
-    {
-        return ConfiguredSource.Create(
-            string.IsNullOrWhiteSpace(Id) ? ConfiguredSource.CreateId(HostPath) : Id,
-            string.IsNullOrWhiteSpace(Name) ? Path.GetFileName(Path.TrimEndingDirectorySeparator(HostPath)) : Name,
-            Kind,
-            HostPath,
-            IndexCode,
-            IndexDocs,
-            DocIncludes is { Count: > 0 } ? DocIncludes : null,
-            CodeIncludes is { Count: > 0 } ? CodeIncludes : null,
-            Excludes is { Count: > 0 } ? Excludes : null);
-    }
-
-    public static SourceDefinition FromConfiguredSource(ConfiguredSource source)
-    {
-        return new SourceDefinition(
-            source.Id,
-            source.Name,
-            source.Kind,
-            source.HostPath,
-            source.IndexCode,
-            source.IndexDocs,
-            source.DocIncludes,
-            source.CodeIncludes,
-            source.Excludes);
-    }
-}
-
-internal sealed record ConfiguredSource(
+public sealed record ConfiguredSource(
     string Id,
     string Name,
     SourceKind Kind,
@@ -124,18 +72,18 @@ internal sealed record ConfiguredSource(
         "**/*.py",
     ];
 
-    internal static string CreateId(string path)
+    public static string CreateId(string path)
     {
-        var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+        var name = GetLastPathSegment(path);
         return string.IsNullOrWhiteSpace(name) ? "source" : name;
     }
 
-    internal static string ToAccessiblePath(string hostPath)
+    public static string ToAccessiblePath(string hostPath)
     {
         return ToAccessiblePath(CreateId(hostPath), hostPath);
     }
 
-    internal static string ToAccessiblePath(string id, string hostPath)
+    public static string ToAccessiblePath(string id, string hostPath)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
             && hostPath.Length >= 2
@@ -148,9 +96,9 @@ internal sealed record ConfiguredSource(
         return hostPath;
     }
 
-    internal string GetAccessiblePath() => ToAccessiblePath(Id, HostPath);
+    public string GetAccessiblePath() => ToAccessiblePath(Id, HostPath);
 
-    internal static string GetContainerSourcePath(string id) =>
+    public static string GetContainerSourcePath(string id) =>
         $"/data/sources/{SanitizeContainerPathSegment(id)}";
 
     private static string SanitizeContainerPathSegment(string value)
@@ -168,13 +116,17 @@ internal sealed record ConfiguredSource(
         {
             return path;
         }
+
         return Path.GetFullPath(path);
     }
 
     private static IReadOnlyList<string> GetDefaultDocIncludes(SourceKind kind) =>
         kind == SourceKind.Repository ? DefaultRepositoryDocIncludes : DefaultKnowledgeDocIncludes;
-}
 
-internal sealed record ResolvedSourceConfiguration(
-    IReadOnlyList<ConfiguredSource> Sources,
-    IReadOnlyList<string> KnowledgeRoots);
+    private static string GetLastPathSegment(string path)
+    {
+        var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, '\\', '/');
+        var lastSeparator = trimmed.LastIndexOfAny(['\\', '/']);
+        return lastSeparator >= 0 ? trimmed[(lastSeparator + 1)..] : Path.GetFileName(trimmed);
+    }
+}

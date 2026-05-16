@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using KnowledgeSearch;
+using KnowledgeSearch.Core.Domain.Sources;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

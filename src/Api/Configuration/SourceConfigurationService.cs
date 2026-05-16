@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using KnowledgeSearch.Core.Common;
+using KnowledgeSearch.Core.Domain.Sources;
 using Microsoft.Extensions.Configuration;
 
 namespace KnowledgeSearch;
@@ -48,13 +50,13 @@ internal sealed class SourceConfigurationService(
         return JsonSerializer.Serialize(GetConfiguration(), _jsonOptions);
     }
 
-    public SaveSourcesResult Save(SourceConfigurationFile configuration)
+    public Result Save(SourceConfigurationFile configuration)
     {
         var normalized = Normalize(configuration);
         var validationError = Validate(normalized);
         if (validationError is not null)
         {
-            return new SaveSourcesResult(false, validationError);
+            return Result.Validation(validationError);
         }
 
         lock (_lock)
@@ -64,7 +66,7 @@ internal sealed class SourceConfigurationService(
             File.WriteAllText(path, JsonSerializer.Serialize(normalized, _jsonOptions));
         }
 
-        return new SaveSourcesResult(true, null);
+        return Result.Success();
     }
 
     private SourceConfigurationFile ReadConfiguration()
