@@ -26,6 +26,9 @@ var staticDir = Path.GetDirectoryName(indexHtmlPath)!;
 
 var logPath = Path.ChangeExtension(dbPath, ".log");
 
+builder.Services.AddSingleton<ISourceConfigurationService>(_ =>
+    new SourceConfigurationService(builder.Configuration, Environment.GetEnvironmentVariable));
+
 var dbService = new DbService(dbPath, roots);
 builder.Services.AddSingleton<IDbService>(dbService);
 builder.Services.AddSingleton<ILogService>(new LogService(logPath));
@@ -81,6 +84,7 @@ app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
 
 app.MapStaticRoutes(indexHtmlPath, staticDir);
 app.MapSkillsRoutes(skillsDir);
+app.MapSourcesRoutes();
 app.MapSearchRoutes();
 app.MapEventsRoutes();
 app.MapCodeGraphRoutes();
