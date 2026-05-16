@@ -39,4 +39,10 @@ internal interface IDbService
     /// Retorna los nombres (último segmento del path) de los roots configurados.
     /// </summary>
     IReadOnlyList<string> GetRootNames();
+
+    /// <summary>
+    /// Reemplaza los roots activos e indexa los directorios nuevos de forma incremental.
+    /// Llamado por el endpoint PUT /sources después de guardar la configuración.
+    /// </summary>
+    void UpdateRoots(IReadOnlyList<string> newRoots);
 }

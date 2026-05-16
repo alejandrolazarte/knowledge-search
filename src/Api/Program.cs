@@ -49,7 +49,7 @@ else
 
 builder.Services.AddHostedService(serviceProvider =>
     new WatcherService(
-        roots.AsReadOnly(),
+        serviceProvider.GetRequiredService<ISourceConfigurationService>(),
         serviceProvider.GetRequiredService<IDbService>(),
         serviceProvider.GetRequiredService<ILogService>(),
         serviceProvider.GetRequiredService<IFileChangeSource>()));

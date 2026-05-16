@@ -7,12 +7,24 @@ internal static class SourcesEndpoints
         app.MapGet("/sources", (ISourceConfigurationService sources) =>
             Results.Ok(sources.GetConfiguration()));
 
-        app.MapPut("/sources", (SourceConfigurationFile request, ISourceConfigurationService sources) =>
+        app.MapPut("/sources", (SourceConfigurationFile request, ISourceConfigurationService sources, IDbService dbService) =>
         {
             var result = sources.Save(request);
-            return result.Success
-                ? Results.Ok(sources.GetConfiguration())
-                : Results.BadRequest(new ErrorResult(result.Error ?? "Configuración inválida."));
+            if (!result.Success)
+            {
+                return Results.BadRequest(new ErrorResult(result.Error ?? "Configuración inválida."));
+            }
+
+            var savedConfig = sources.GetConfiguration();
+            var newRoots = savedConfig.Sources
+                .Select(s => s.ToConfiguredSource())
+                .Where(s => s.IndexDocs)
+                .Select(s => ConfiguredSource.ToAccessiblePath(s.HostPath))
+                .ToArray();
+
+            dbService.UpdateRoots(newRoots);
+
+            return Results.Ok(savedConfig);
         });
 
         app.MapGet("/sources/export", (ISourceConfigurationService sources) =>
