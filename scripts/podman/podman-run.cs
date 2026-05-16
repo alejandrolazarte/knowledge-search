@@ -3,22 +3,20 @@
 // Uso (desde cualquier directorio dentro del repo):
 //   dotnet run scripts/podman/podman-run.cs [-- --build] [-- --detach]
 //
-// Variables de entorno requeridas:
-//   KNOWLEDGE_DIRS  path(s) a carpetas con archivos .md de knowledge, separados por ;
-//
+// No requiere variables de entorno. Las fuentes se configuran desde la UI de Sources.
 // Variables de entorno opcionales:
-//   SKILLS_DIR      path a los skills de Claude (default: ~/.claude/skills)
+//   SKILLS_DIR  path a los skills de Claude (default: ~/.claude/skills)
 
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 var build  = args.Contains("--build");
 var detach = args.Contains("--detach");
 
 var root      = FindRoot();
 var dataDir   = Path.Combine(root, "data");
-var knowledgeRoots = RequireEnv("KNOWLEDGE_DIRS",
-    "Ejemplo: $env:KNOWLEDGE_DIRS = 'D:\\mis-docs\\knowledge'");
-var knowledgeMounts = BuildKnowledgeMounts(knowledgeRoots);
+var driveMounts = BuildDriveMounts(dataDir);
 var skills    = Environment.GetEnvironmentVariable("SKILLS_DIR")
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
 
@@ -40,10 +38,10 @@ string[] runArgs =
     "--name", Container,
     "-p", "5111:5111",
     "-v", $"{dataDir}:/data/db:Z",
-    ..knowledgeMounts.VolumeArgs,
+    ..driveMounts,
     "-v", $"{skills}:/data/skills:Z",
     "-e", "KNOWLEDGE_DB=/data/db/knowledge.db",
-    "-e", $"KNOWLEDGE_DIRS={knowledgeMounts.ContainerRoots}",
+    "-e", "SOURCES_CONFIG=/data/db/sources.json",
     "-e", "SKILLS_DIR=/data/skills",
     ..modeFlags,
     Image,
@@ -61,45 +59,29 @@ static string FindRoot()
     throw new InvalidOperationException("Project root no encontrado (buscando Containerfile).");
 }
 
-static string RequireEnv(string name, string hint)
+static string[] BuildDriveMounts(string dataDir)
 {
-    var val = Environment.GetEnvironmentVariable(name);
-    if (val is not null) return val;
+    var sourcesJson = Path.Combine(dataDir, "sources.json");
+    if (!File.Exists(sourcesJson))
+    {
+        return [];
+    }
 
-    Console.ForegroundColor = ConsoleColor.Red;
-    Console.Error.WriteLine($"ERROR: {name} no está seteado. {hint}");
-    Console.ResetColor();
-    Environment.Exit(1);
-    return null!;
-}
-
-static KnowledgeMounts BuildKnowledgeMounts(string configuredRoots)
-{
-    var hostRoots = configuredRoots
-        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Select(Path.GetFullPath)
+    var json = File.ReadAllText(sourcesJson);
+    var driveLetters = Regex.Matches(json, @"""hostPath""\s*:\s*""([A-Za-z]):\\")
+        .Select(m => char.ToLowerInvariant(m.Groups[1].Value[0]))
+        .Distinct()
         .ToArray();
 
-    if (hostRoots.Length == 0)
-    {
-        throw new InvalidOperationException("KNOWLEDGE_DIRS no contiene roots válidos.");
-    }
-
     var volumeArgs = new List<string>();
-    var containerRoots = new List<string>();
-
-    for (var i = 0; i < hostRoots.Length; i++)
+    foreach (var drive in driveLetters)
     {
-        var containerRoot = hostRoots.Length == 1
-            ? "/data/knowledge"
-            : $"/data/knowledge/root{i + 1}";
-
+        var hostDrive = $"{char.ToUpperInvariant(drive)}:\\";
         volumeArgs.Add("-v");
-        volumeArgs.Add($"{hostRoots[i]}:{containerRoot}:Z");
-        containerRoots.Add(containerRoot);
+        volumeArgs.Add($"{hostDrive}:/mnt/{drive}:Z");
     }
 
-    return new KnowledgeMounts(volumeArgs.ToArray(), string.Join(';', containerRoots));
+    return volumeArgs.ToArray();
 }
 
 static void Info(string msg)
@@ -130,5 +112,3 @@ static void Silent(string[] args)
     using var p = Process.Start(psi)!;
     p.WaitForExit();
 }
-
-internal sealed record KnowledgeMounts(string[] VolumeArgs, string ContainerRoots);

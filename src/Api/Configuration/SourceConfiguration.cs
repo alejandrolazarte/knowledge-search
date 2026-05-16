@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 
 namespace KnowledgeSearch;
@@ -79,7 +80,7 @@ internal sealed record ConfiguredSource(
             id,
             name,
             kind,
-            Path.GetFullPath(hostPath),
+            NormalizeHostPath(hostPath),
             indexCode ?? kind == SourceKind.Repository,
             indexDocs ?? true,
             docIncludes ?? GetDefaultDocIncludes(kind),
@@ -127,6 +128,30 @@ internal sealed record ConfiguredSource(
     {
         var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
         return string.IsNullOrWhiteSpace(name) ? "source" : name;
+    }
+
+    internal static string ToAccessiblePath(string hostPath)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return hostPath;
+        }
+        if (hostPath.Length >= 2 && char.IsLetter(hostPath[0]) && hostPath[1] == ':')
+        {
+            var drive = char.ToLowerInvariant(hostPath[0]);
+            var rest = hostPath[2..].Replace('\\', '/').TrimStart('/');
+            return $"/mnt/{drive}/{rest}";
+        }
+        return hostPath;
+    }
+
+    private static string NormalizeHostPath(string path)
+    {
+        if (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':')
+        {
+            return path;
+        }
+        return Path.GetFullPath(path);
     }
 
     private static IReadOnlyList<string> GetDefaultDocIncludes(SourceKind kind) =>

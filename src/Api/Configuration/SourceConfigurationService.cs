@@ -35,7 +35,9 @@ internal sealed class SourceConfigurationService(
             .Sources
             .Select(source => source.ToConfiguredSource())
             .Where(source => source.IndexDocs)
-            .Select(source => Path.GetFileName(Path.TrimEndingDirectorySeparator(source.HostPath)))
+            .Select(source => Path.GetFileName(
+                Path.TrimEndingDirectorySeparator(
+                    ConfiguredSource.ToAccessiblePath(source.HostPath))))
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .ToArray();
     }
@@ -75,12 +77,7 @@ internal sealed class SourceConfigurationService(
             return Normalize(fromFile ?? new SourceConfigurationFile(1, []));
         }
 
-        return Normalize(new SourceConfigurationFile(
-            1,
-            AppConfiguration.ResolveSources(configuration, getEnvironmentVariable)
-                .Sources
-                .Select(SourceDefinition.FromConfiguredSource)
-                .ToArray()));
+        return new SourceConfigurationFile(1, []);
     }
 
     private static SourceConfigurationFile Normalize(SourceConfigurationFile configuration)
