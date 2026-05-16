@@ -9,6 +9,7 @@ obj/
 .vs/
 
 # Base de datos local
+data/
 knowledge.db
 knowledge.db-wal
 knowledge.db-shm
