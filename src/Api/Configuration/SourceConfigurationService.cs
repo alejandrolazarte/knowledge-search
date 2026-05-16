@@ -117,6 +117,6 @@ internal sealed class SourceConfigurationService(
     {
         return getEnvironmentVariable("SOURCES_CONFIG")
             ?? configuration["SourcesConfig"]
-            ?? Path.Combine(AppContext.BaseDirectory, "data", "sources.json");
+            ?? Path.GetFullPath("../data/sources.json");
     }
 }
