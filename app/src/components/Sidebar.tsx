@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { THEMES } from '../hooks/useTheme'
 import type { Theme } from '../hooks/useTheme'
 import type { FontSize } from '../hooks/useFontSize'
@@ -106,23 +106,57 @@ export function Sidebar({ view, onView, theme, onTheme, fontSize, onFontSize }: 
             <span className="w-3 h-3 rounded-full border border-gh-border" style={{ background: currentTheme.accent }} />
           </button>
         ) : (
-          <div className="px-2 py-1 space-y-0.5">
-            <p className="text-[10px] text-gh-muted mb-1">Tema</p>
-            {THEMES.map(t => (
-              <button key={t.id} onClick={() => onTheme(t.id)}
-                className={`flex items-center gap-2 w-full px-2 py-1 rounded text-xs transition-colors
-                  ${theme === t.id
-                    ? 'bg-gh-card text-gh-text'
-                    : 'text-gh-muted hover:text-gh-text hover:bg-gh-surface'}`}
-              >
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.accent }} />
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <ThemePicker theme={theme} onTheme={onTheme} />
         )}
       </div>
     </aside>
+  )
+}
+
+function ThemePicker({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
+  const currentTheme = THEMES.find(t => t.id === theme)!
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div ref={containerRef} className="relative px-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs text-gh-muted hover:text-gh-text hover:bg-gh-surface transition-colors"
+      >
+        <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-gh-border" style={{ background: currentTheme.accent }} />
+        <span className="flex-1 text-left">{currentTheme.label}</span>
+        <svg className={`w-3 h-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 right-0 mb-1 bg-gh-surface border border-gh-border rounded shadow-lg overflow-hidden z-50">
+          {THEMES.map(t => (
+            <button key={t.id} onClick={() => { onTheme(t.id); setOpen(false) }}
+              className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs transition-colors
+                ${theme === t.id
+                  ? 'bg-gh-card text-gh-text'
+                  : 'text-gh-muted hover:text-gh-text hover:bg-gh-card'}`}
+            >
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.accent }} />
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
