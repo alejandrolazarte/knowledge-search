@@ -1,6 +1,8 @@
+using KnowledgeSearch.Core.Abstractions.Search;
+
 namespace KnowledgeSearch;
 
-internal interface IDbService
+internal interface IDbService : IDocumentIndex
 {
     /// <summary>
     /// Busca documentos usando cascade phrase → AND → OR según <paramref name="modes"/>.
@@ -40,9 +42,4 @@ internal interface IDbService
     /// </summary>
     IReadOnlyList<string> GetRootNames();
 
-    /// <summary>
-    /// Reemplaza los roots activos e indexa los directorios nuevos de forma incremental.
-    /// Llamado por el endpoint PUT /sources después de guardar la configuración.
-    /// </summary>
-    void UpdateRoots(IReadOnlyList<string> newRoots);
 }

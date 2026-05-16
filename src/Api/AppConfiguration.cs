@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using KnowledgeSearch.Core.Domain.Sources;
 
 namespace KnowledgeSearch;
 

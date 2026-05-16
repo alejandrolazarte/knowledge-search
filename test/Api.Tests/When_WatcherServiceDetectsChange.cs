@@ -1,4 +1,5 @@
 using KnowledgeSearch;
+using KnowledgeSearch.Core.Domain.Sources;
 using Moq;
 using Shouldly;
 using Xunit;

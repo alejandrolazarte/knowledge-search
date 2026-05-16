@@ -1,11 +1,8 @@
+using KnowledgeSearch.Core.Abstractions.Sources;
+using KnowledgeSearch.Core.Domain.Sources;
+
 namespace KnowledgeSearch;
 
-internal interface ISourceConfigurationService
+internal interface ISourceConfigurationService : ISourceConfigurationStore
 {
-    SourceConfigurationFile GetConfiguration();
-    IReadOnlyList<string> GetKnowledgeRootNames();
-    string ExportJson();
-    SaveSourcesResult Save(SourceConfigurationFile configuration);
 }
-
-internal sealed record SaveSourcesResult(bool Success, string? Error);

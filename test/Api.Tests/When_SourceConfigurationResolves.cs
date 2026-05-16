@@ -1,4 +1,5 @@
 using KnowledgeSearch;
+using KnowledgeSearch.Core.Domain.Sources;
 using Microsoft.Extensions.Configuration;
 using Shouldly;
 using Xunit;

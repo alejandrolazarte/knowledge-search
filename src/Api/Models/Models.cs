@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using KnowledgeSearch.Core.Domain.Sources;
 
 namespace KnowledgeSearch;
 
@@ -20,7 +21,6 @@ public record LogEvent(
 [JsonSerializable(typeof(SourceConfigurationFile))]
 [JsonSerializable(typeof(SourceDefinition))]
 [JsonSerializable(typeof(List<SourceDefinition>))]
-[JsonSerializable(typeof(SaveSourcesResult))]
 [JsonSerializable(typeof(ConfiguredSource))]
 [JsonSerializable(typeof(List<ConfiguredSource>))]
 [JsonSerializable(typeof(LogEvent))]
