@@ -58,4 +58,11 @@ public sealed class Result<T> : Result
     public static implicit operator Result<T>(T value) => new(value, null);
 
     public static implicit operator Result<T>(ResultError error) => new(default, error);
+
+    public TOut Resolve<TOut>(
+        Func<T, TOut> onSuccess,
+        Func<ResultError, TOut> onFailure)
+    {
+        return IsSuccess ? onSuccess(Value!) : onFailure(Error!);
+    }
 }
