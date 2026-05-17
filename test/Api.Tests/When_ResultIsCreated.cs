@@ -56,4 +56,16 @@ public class When_ResultIsCreated
         result.Error.ShouldNotBeNull();
         result.Error.Kind.ShouldBe(ErrorKind.NotFound);
     }
+
+    [Fact]
+    public void Then_GenericResultCanBeResolved()
+    {
+        Result<string> success = "Documentation";
+        Result<string> failure = new ResultError("not_found", "No existe.", ErrorKind.NotFound);
+
+        success.Resolve(value => value.ToUpperInvariant(), error => error.Code)
+            .ShouldBe("DOCUMENTATION");
+        failure.Resolve(value => value.ToUpperInvariant(), error => error.Code)
+            .ShouldBe("not_found");
+    }
 }
