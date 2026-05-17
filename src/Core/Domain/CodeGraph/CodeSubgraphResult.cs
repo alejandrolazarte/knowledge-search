@@ -1,6 +1,6 @@
-namespace KnowledgeSearch;
+namespace KnowledgeSearch.Core.Domain.CodeGraph;
 
-internal record CodeSubgraphResult(
+public sealed record CodeSubgraphResult(
     IReadOnlyList<CodeNode> Nodes,
     IReadOnlyList<CodeEdge> Edges,
     IReadOnlyDictionary<string, int> NodeWeights,

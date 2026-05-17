@@ -1,4 +1,5 @@
 using KnowledgeSearch.Core.Abstractions.Search;
+using KnowledgeSearch.Core.Domain.Search;
 
 namespace KnowledgeSearch;
 

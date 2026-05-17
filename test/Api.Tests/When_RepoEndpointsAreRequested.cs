@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using KnowledgeSearch;
+using KnowledgeSearch.Core.Common;
+using KnowledgeSearch.Core.Domain.Search;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -209,7 +211,7 @@ public class When_RepoEndpointsAreRequested : IDisposable
                 SearchMode.Default,
                 It.Is<IReadOnlyList<string>?>(repos => repos != null && repos.Contains("repo-alpha")),
                 It.Is<IReadOnlyList<CodeNodeKind>?>(kinds => kinds != null && kinds.Contains(CodeNodeKind.Class))))
-            .Returns([
+            .Returns(Result.Success<IReadOnlyList<CodeDocumentSearchResult>>([
                 new CodeDocumentSearchResult(
                     "repo-alpha",
                     "MyApp.UserService",
@@ -219,10 +221,10 @@ public class When_RepoEndpointsAreRequested : IDisposable
                     3,
                     "public class UserService { string token = \"ImportantToken\"; }",
                     -4.2),
-            ]);
+            ]));
 
         var response = await _client.GetAsync("/repos/code-search?q=ImportantToken&repos=repo-alpha&kinds=Class");
-        var body = await response.Content.ReadFromJsonAsync<List<CodeDocumentSearchApiResponse>>();
+        var body = await response.Content.ReadFromJsonAsync<List<CodeDocumentSearchResponse>>();
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         body.ShouldNotBeNull();

@@ -1,11 +1,10 @@
 using System.Text.Json.Serialization;
+using KnowledgeSearch.Core.Domain.Search;
 using KnowledgeSearch.Core.Domain.Sources;
+using KnowledgeSearch.Core.UseCases.Search;
 
 namespace KnowledgeSearch;
 
-internal record SearchResult(string Title, string Section, string Path, int Line, string Content, string Root);
-internal record IndexResult(int Added, int Updated, int Deleted);
-internal record HealthResult(string Status);
 internal record ErrorResult(string Error);
 internal record SkillSummary(string Name, string Description, string DirName, string FilePath);
 
@@ -26,19 +25,20 @@ public record LogEvent(
 [JsonSerializable(typeof(LogEvent))]
 [JsonSerializable(typeof(IndexResult))]
 [JsonSerializable(typeof(HealthResult))]
+[JsonSerializable(typeof(SaveDocumentFileResponse))]
 [JsonSerializable(typeof(ErrorResult))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(ScanDirectoryRequest))]
-[JsonSerializable(typeof(ScanSummaryApiResponse))]
-[JsonSerializable(typeof(CodeGraphApiResponse))]
-[JsonSerializable(typeof(List<CodeNodeApiResponse>))]
-[JsonSerializable(typeof(List<CodeEdgeApiResponse>))]
-[JsonSerializable(typeof(CodeSubgraphApiResponse))]
-[JsonSerializable(typeof(List<CodeSearchNodeApiResponse>))]
-[JsonSerializable(typeof(CrossRepoSubgraphApiResponse))]
-[JsonSerializable(typeof(List<CrossRepoSearchNodeApiResponse>))]
-[JsonSerializable(typeof(List<CrossRepoSearchEdgeApiResponse>))]
-[JsonSerializable(typeof(List<CrossRepoLinkApiResponse>))]
-[JsonSerializable(typeof(CrossRefSummaryApiResponse))]
-[JsonSerializable(typeof(List<CodeDocumentSearchApiResponse>))]
+[JsonSerializable(typeof(ScanRepositoryResponse))]
+[JsonSerializable(typeof(CodeGraphResponse))]
+[JsonSerializable(typeof(List<CodeNodeResponse>))]
+[JsonSerializable(typeof(List<CodeEdgeResponse>))]
+[JsonSerializable(typeof(CodeSubgraphResponse))]
+[JsonSerializable(typeof(List<CodeSearchNodeResponse>))]
+[JsonSerializable(typeof(CrossRepoSubgraphResponse))]
+[JsonSerializable(typeof(List<CrossRepoSearchNodeResponse>))]
+[JsonSerializable(typeof(List<CrossRepoSearchEdgeResponse>))]
+[JsonSerializable(typeof(List<CrossRepoLinkResponse>))]
+[JsonSerializable(typeof(CrossRefSummaryResponse))]
+[JsonSerializable(typeof(List<CodeDocumentSearchResponse>))]
 internal partial class AppJsonContext : JsonSerializerContext { }

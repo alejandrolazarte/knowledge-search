@@ -1,3 +1,5 @@
+using KnowledgeSearch.Core.Common;
+using KnowledgeSearch.Core.Domain.Search;
 using Microsoft.Data.Sqlite;
 
 namespace KnowledgeSearch;
@@ -145,7 +147,7 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
         return names;
     }
 
-    public IReadOnlyList<CodeDocumentSearchResult> SearchCodeDocuments(
+    public Result<IReadOnlyList<CodeDocumentSearchResult>> SearchCodeDocuments(
         string query,
         int limit,
         SearchMode modes,
@@ -206,7 +208,7 @@ internal sealed class CodeGraphRepository : ICodeGraphRepository
                 reader.GetDouble(7)));
         }
 
-        return results;
+        return Result.Success<IReadOnlyList<CodeDocumentSearchResult>>(results);
     }
 
     public bool IsCodePathAllowed(string fullPath)

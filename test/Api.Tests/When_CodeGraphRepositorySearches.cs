@@ -1,4 +1,5 @@
 using KnowledgeSearch;
+using KnowledgeSearch.Core.Domain.Search;
 using Shouldly;
 using Xunit;
 
@@ -99,10 +100,11 @@ public class When_CodeGraphRepositorySearches : IDisposable
 
         var result = _sut.SearchCodeDocuments("ImportantToken", 10, SearchMode.Default, null, null);
 
-        result.ShouldHaveSingleItem();
-        result[0].RepositoryName.ShouldBe("my-repo");
-        result[0].Name.ShouldBe("UserService");
-        result[0].Content.ShouldContain("ImportantToken");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldHaveSingleItem();
+        result.Value![0].RepositoryName.ShouldBe("my-repo");
+        result.Value[0].Name.ShouldBe("UserService");
+        result.Value[0].Content.ShouldContain("ImportantToken");
     }
 
     [Fact]
@@ -128,9 +130,10 @@ public class When_CodeGraphRepositorySearches : IDisposable
             ["repo-beta"],
             [CodeNodeKind.Interface]);
 
-        result.ShouldHaveSingleItem();
-        result[0].RepositoryName.ShouldBe("repo-beta");
-        result[0].Kind.ShouldBe(CodeNodeKind.Interface);
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldHaveSingleItem();
+        result.Value![0].RepositoryName.ShouldBe("repo-beta");
+        result.Value[0].Kind.ShouldBe(CodeNodeKind.Interface);
     }
 
     [Fact]
@@ -146,8 +149,8 @@ public class When_CodeGraphRepositorySearches : IDisposable
         File.WriteAllText(filePath, "public class UserService { string value = \"NewNeedle\"; }");
         _sut.SaveScanResult("my-repo", new CodeGraphScanResult(nodes, [], 1, 0));
 
-        _sut.SearchCodeDocuments("OldNeedle", 10, SearchMode.Default, null, null).ShouldBeEmpty();
-        _sut.SearchCodeDocuments("NewNeedle", 10, SearchMode.Default, null, null).ShouldHaveSingleItem();
+        _sut.SearchCodeDocuments("OldNeedle", 10, SearchMode.Default, null, null).Value.ShouldBeEmpty();
+        _sut.SearchCodeDocuments("NewNeedle", 10, SearchMode.Default, null, null).Value.ShouldHaveSingleItem();
     }
 
     public void Dispose()

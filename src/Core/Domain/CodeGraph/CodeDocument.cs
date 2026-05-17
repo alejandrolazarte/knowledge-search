@@ -1,6 +1,6 @@
-namespace KnowledgeSearch;
+namespace KnowledgeSearch.Core.Domain.CodeGraph;
 
-internal record CodeDocument(
+public sealed record CodeDocument(
     string RepositoryName,
     string Identifier,
     string Name,
@@ -9,7 +9,7 @@ internal record CodeDocument(
     int Line,
     string Content);
 
-internal record CodeDocumentSearchResult(
+public sealed record CodeDocumentSearchResult(
     string RepositoryName,
     string Identifier,
     string Name,

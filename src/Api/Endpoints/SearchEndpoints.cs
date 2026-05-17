@@ -1,4 +1,5 @@
-using Microsoft.Data.Sqlite;
+using KnowledgeSearch.Core.Domain.Search;
+using KnowledgeSearch.Core.UseCases.Search;
 
 namespace KnowledgeSearch;
 
@@ -6,131 +7,75 @@ internal static class SearchEndpoints
 {
     public static void MapSearchRoutes(this WebApplication app)
     {
-        app.MapGet("/search", (IDbService dbService, string q, int limit = 5, string? modes = null,
-            string? roots = null) =>
+        app.MapGet("/search", async (
+            SearchDocumentsUseCase useCase,
+            string? q,
+            int limit = 5,
+            string? modes = null,
+            string? roots = null,
+            CancellationToken cancellationToken = default) =>
         {
-            if (string.IsNullOrWhiteSpace(q))
-            {
-                return Results.BadRequest("Falta parámetro q");
-            }
-
-            SearchMode searchModes;
-            try
-            {
-                searchModes = modes is not null
-                    ? Enum.Parse<SearchMode>(modes, ignoreCase: true)
-                    : SearchMode.Default;
-            }
-            catch (ArgumentException)
-            {
-                return Results.BadRequest($"modes inválido: '{modes}'. Valores válidos: phrase, and, or");
-            }
-
-            var rootFilter = roots?
-                .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .ToList();
-
-            try
-            {
-                var results = dbService.Search(q, limit, searchModes, rootFilter);
-                return Results.Ok(results);
-            }
-            catch (SqliteException ex)
-            {
-                return Results.BadRequest($"Query inválida: {ex.Message}");
-            }
+            var result = await useCase.ExecuteAsync(
+                new SearchDocumentsCommand(q, limit, modes, roots),
+                cancellationToken);
+            return result.ToHttpResult(response => Results.Ok(response.Results));
         });
 
-        app.MapPost("/index", (IDbService dbService) =>
+        app.MapPost("/index", async (
+            IndexDocumentsUseCase useCase,
+            CancellationToken cancellationToken) =>
         {
-            var result = dbService.IndexDirectories();
-            return Results.Ok(result);
+            var result = await useCase.ExecuteAsync(new IndexDocumentsCommand(), cancellationToken);
+            return result.ToHttpResult(response => Results.Ok(response.Result));
         });
 
-        app.MapGet("/file", (string path, IDbService dbService) =>
+        app.MapGet("/file", async (
+            string? path,
+            GetDocumentFileUseCase useCase,
+            CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return Results.BadRequest("Falta parámetro path");
-            }
-
-            var fullPath = Path.GetFullPath(path);
-
-            if (!dbService.IsPathAllowed(fullPath))
-            {
-                return Results.BadRequest("Ruta fuera de los roots configurados");
-            }
-
-            if (!File.Exists(fullPath))
-            {
-                return Results.NotFound();
-            }
-
-            return Results.Text(File.ReadAllText(fullPath), "text/plain; charset=utf-8");
+            var result = await useCase.ExecuteAsync(new GetDocumentFileCommand(path), cancellationToken);
+            return result.ToHttpResult(response =>
+                Results.Text(response.Content, "text/plain; charset=utf-8"));
         });
 
-        app.MapPut("/file", async (string path, HttpRequest request, IDbService dbService) =>
+        app.MapPut("/file", async (
+            string? path,
+            HttpRequest request,
+            SaveDocumentFileUseCase useCase,
+            CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return Results.BadRequest("Falta parámetro path");
-            }
-
-            var fullPath = Path.GetFullPath(path);
-
-            if (!dbService.IsPathAllowed(fullPath))
-            {
-                return Results.BadRequest("Ruta fuera de los roots configurados");
-            }
-
-            if (!File.Exists(fullPath))
-            {
-                return Results.NotFound();
-            }
-
             using var reader = new StreamReader(request.Body);
-            var content = await reader.ReadToEndAsync();
-            await File.WriteAllTextAsync(fullPath, content);
-
-            return Results.Ok(new { saved = true, path = fullPath });
+            var content = await reader.ReadToEndAsync(cancellationToken);
+            var result = await useCase.ExecuteAsync(
+                new SaveDocumentFileCommand(path, content),
+                cancellationToken);
+            return result.ToHttpResult(response => Results.Ok(response));
         });
 
-        app.MapGet("/image", (string path, IDbService dbService) =>
+        app.MapGet("/image", async (
+            string? path,
+            GetImageFileUseCase useCase,
+            CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return Results.BadRequest("Falta parámetro path");
-            }
-
-            var fullPath = Path.GetFullPath(path);
-
-            if (!dbService.IsPathAllowed(fullPath))
-            {
-                return Results.BadRequest("Ruta fuera de los roots configurados");
-            }
-
-            if (!File.Exists(fullPath))
-            {
-                return Results.NotFound();
-            }
-
-            var contentType = Path.GetExtension(fullPath).ToLowerInvariant() switch
-            {
-                ".png" => "image/png",
-                ".jpg" => "image/jpeg",
-                ".jpeg" => "image/jpeg",
-                ".gif" => "image/gif",
-                ".svg" => "image/svg+xml",
-                ".webp" => "image/webp",
-                _ => "application/octet-stream",
-            };
-
-            return Results.File(File.ReadAllBytes(fullPath), contentType);
+            var result = await useCase.ExecuteAsync(new GetImageFileCommand(path), cancellationToken);
+            return result.ToHttpResult(response => Results.File(response.Content, response.ContentType));
         });
 
-        app.MapGet("/roots", (ISourceConfigurationService sources) =>
-            Results.Ok(sources.GetKnowledgeRootNames()));
+        app.MapGet("/roots", async (
+            GetKnowledgeRootsUseCase useCase,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await useCase.ExecuteAsync(new GetKnowledgeRootsCommand(), cancellationToken);
+            return result.ToHttpResult(response => Results.Ok(response.Roots));
+        });
 
-        app.MapGet("/health", () => Results.Ok(new HealthResult("ok")));
+        app.MapGet("/health", async (
+            GetHealthUseCase useCase,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await useCase.ExecuteAsync(new GetHealthCommand(), cancellationToken);
+            return result.ToHttpResult(response => Results.Ok(response.Health));
+        });
     }
 }

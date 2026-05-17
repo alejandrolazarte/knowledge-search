@@ -1,7 +1,7 @@
-namespace KnowledgeSearch;
+namespace KnowledgeSearch.Core.Domain.Search;
 
 [Flags]
-internal enum SearchMode
+public enum SearchMode
 {
     None = 0,
     Phrase = 1,
