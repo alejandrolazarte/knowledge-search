@@ -1,6 +1,6 @@
-namespace KnowledgeSearch;
+namespace KnowledgeSearch.Core.Domain.CodeGraph;
 
-internal record CodeNode(
+public sealed record CodeNode(
     string Identifier,
     string Name,
     CodeNodeKind Kind,

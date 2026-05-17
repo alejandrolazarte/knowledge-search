@@ -1,6 +1,6 @@
-namespace KnowledgeSearch;
+namespace KnowledgeSearch.Core.Domain.CodeGraph;
 
-internal record CodeEdge(
+public sealed record CodeEdge(
     string SourceIdentifier,
     string TargetIdentifier,
     CodeEdgeKind Kind,

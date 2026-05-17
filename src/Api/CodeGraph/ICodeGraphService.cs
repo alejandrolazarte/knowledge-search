@@ -1,9 +1,7 @@
+using KnowledgeSearch.Core.Abstractions.CodeGraph;
+
 namespace KnowledgeSearch;
 
-internal interface ICodeGraphService
+internal interface ICodeGraphService : ICodeGraphSearchService
 {
-    CodeGraphScanResult ScanDirectory(string directoryPath);
-    CodeSubgraphResult SearchSubgraph(string repositoryName, string query, int depth);
-    CrossRepoSubgraphResult SearchSubgraphAcrossRepositories(string query, int depth);
-    IReadOnlyList<CrossRepoCodeEdge> BuildCrossRepoEdges();
 }

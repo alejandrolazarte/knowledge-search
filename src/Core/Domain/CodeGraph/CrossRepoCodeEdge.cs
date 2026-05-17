@@ -1,8 +1,11 @@
-namespace KnowledgeSearch;
+namespace KnowledgeSearch.Core.Domain.CodeGraph;
 
-internal enum CrossRepoEdgeKind { References }
+public enum CrossRepoEdgeKind
+{
+    References,
+}
 
-internal record CrossRepoCodeEdge(
+public sealed record CrossRepoCodeEdge(
     string SourceRepositoryName,
     string SourceIdentifier,
     string TargetRepositoryName,

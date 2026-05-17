@@ -80,6 +80,12 @@ dotnet build src\Api\Api.csproj --no-restore -v minimal
 - Keep classes focused on one responsibility.
 - New services should have an interface named `I<Name>Service`.
 - Each language parser implements `ISourceFileParser`.
+- Keep domain models free of API/application response DTOs. Domain types represent behavior and core concepts; use case response models belong under `Core.UseCases`, and HTTP-only models stay in `Api`.
+- Use Core use cases for application orchestration. Minimal API endpoints should bind HTTP inputs, call a use case, and map `Result<T>` to HTTP.
+- Use `Result` for expected outcomes such as validation errors, not found, conflicts, and unauthorized results.
+- Do not catch repository, SQLite, or Core exceptions in repositories, adapters, or use cases by default. Let unexpected exceptions bubble to the global exception handler, which logs them and returns a friendly error response.
+- Keep concrete IO, SQLite, ASP.NET, and hosting concerns out of Core. Core depends on abstractions; `Api` owns the concrete adapters.
+- Prefer `Result<T>.Resolve(...)` at boundaries when converting success/failure outcomes into transport responses.
 
 ## Testing
 

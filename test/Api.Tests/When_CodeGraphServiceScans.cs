@@ -1,4 +1,5 @@
 using KnowledgeSearch;
+using KnowledgeSearch.Core.Domain.Search;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -143,9 +144,10 @@ public class When_CodeGraphServiceScans : IDisposable
 
         var result = _repository!.SearchCodeDocuments("ImportantToken", 10, SearchMode.Default, null, null);
 
-        result.ShouldHaveSingleItem();
-        result[0].Name.ShouldBe("Handle");
-        result[0].Content.ShouldContain("ImportantToken");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldHaveSingleItem();
+        result.Value![0].Name.ShouldBe("Handle");
+        result.Value[0].Content.ShouldContain("ImportantToken");
     }
 
     public void Dispose()

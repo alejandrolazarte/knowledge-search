@@ -1,3 +1,4 @@
+using KnowledgeSearch.Core.Domain.Search;
 using Microsoft.Data.Sqlite;
 
 namespace KnowledgeSearch;

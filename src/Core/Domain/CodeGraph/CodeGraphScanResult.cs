@@ -1,6 +1,6 @@
-namespace KnowledgeSearch;
+namespace KnowledgeSearch.Core.Domain.CodeGraph;
 
-internal record CodeGraphScanResult(
+public sealed record CodeGraphScanResult(
     IReadOnlyList<CodeNode> Nodes,
     IReadOnlyList<CodeEdge> Edges,
     int FilesScanned,
