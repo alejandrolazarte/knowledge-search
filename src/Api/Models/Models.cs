@@ -1,7 +1,9 @@
 using System.Text.Json.Serialization;
+using KnowledgeSearch.Core.Abstractions.Jobs;
 using KnowledgeSearch.Core.Domain.Search;
 using KnowledgeSearch.Core.Domain.Sources;
 using KnowledgeSearch.Core.UseCases.Search;
+using KnowledgeSearch.Core.UseCases.Sources;
 
 namespace KnowledgeSearch;
 
@@ -41,4 +43,7 @@ public record LogEvent(
 [JsonSerializable(typeof(List<CrossRepoLinkResponse>))]
 [JsonSerializable(typeof(CrossRefSummaryResponse))]
 [JsonSerializable(typeof(List<CodeDocumentSearchResponse>))]
+[JsonSerializable(typeof(EnqueueResponse))]
+[JsonSerializable(typeof(JobStatus))]
+[JsonSerializable(typeof(SaveSourcesResponse))]
 internal partial class AppJsonContext : JsonSerializerContext { }

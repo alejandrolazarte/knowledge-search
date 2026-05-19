@@ -1,5 +1,7 @@
+using KnowledgeSearch.Core.Abstractions.Jobs;
 using KnowledgeSearch.Core.Domain.Search;
 using KnowledgeSearch.Core.UseCases.Search;
+using KnowledgeSearch.Core.UseCases.Sources;
 
 namespace KnowledgeSearch;
 
@@ -22,11 +24,18 @@ internal static class SearchEndpoints
         });
 
         app.MapPost("/index", async (
-            IndexDocumentsUseCase useCase,
+            IJobQueue jobQueue,
+            IIndexDocumentsJobFactory jobFactory,
             CancellationToken cancellationToken) =>
         {
-            var result = await useCase.ExecuteAsync(new IndexDocumentsCommand(), cancellationToken);
-            return result.ToHttpResult(response => Results.Ok(response.Result));
+            var jobId = await jobQueue.EnqueueAsync(jobFactory.Create(), cancellationToken);
+            return Results.Accepted($"/jobs/{jobId}", new EnqueueResponse(jobId));
+        });
+
+        app.MapGet("/jobs/{id:guid}", (Guid id, IJobQueue jobQueue) =>
+        {
+            var status = jobQueue.TryGetStatus(id);
+            return status is null ? Results.NotFound() : Results.Ok(status);
         });
 
         app.MapGet("/file", async (

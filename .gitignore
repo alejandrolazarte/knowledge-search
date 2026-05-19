@@ -10,6 +10,7 @@ obj/
 
 # Base de datos local
 data/
+data-dev/
 knowledge.db
 knowledge.db-wal
 knowledge.db-shm
