@@ -21,7 +21,7 @@ internal static class SourcesEndpoints
             CancellationToken cancellationToken) =>
         {
             var result = await useCase.ExecuteAsync(new SaveSourcesCommand(request), cancellationToken);
-            return result.ToHttpResult(response => Results.Ok(response.Configuration));
+            return result.ToHttpResult(Results.Ok);
         });
 
         app.MapGet("/sources/export", async (

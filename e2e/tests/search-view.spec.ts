@@ -21,10 +21,8 @@ async function configureKnowledgeSource(request: APIRequestContext) {
     },
   })
   expect(saveResponse.ok()).toBeTruthy()
-  const saveBody = await saveResponse.json() as { jobIds?: string[] }
-  if (saveBody.jobIds?.length) {
-    await waitForJobs(request, saveBody.jobIds)
-  }
+  const saveBody = await saveResponse.json() as { jobIds: string[] }
+  await waitForJobs(request, saveBody.jobIds)
 
   const indexResponse = await request.post('/index')
   expect(indexResponse.ok()).toBeTruthy()

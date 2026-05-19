@@ -103,8 +103,8 @@ export function SourcesView() {
         const body = await response.json().catch(() => null) as { error?: string } | null
         throw new Error(body?.error ?? 'Error al guardar')
       }
-      const saved = await response.json() as SourceConfigurationFile
-      setConfig(saved)
+      const saved = await response.json() as { configuration: SourceConfigurationFile, jobIds: string[] }
+      setConfig(saved.configuration)
       setStatus('Saved. Restart or reindex flow required for active index roots.')
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'Error al guardar')

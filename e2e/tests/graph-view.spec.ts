@@ -30,10 +30,8 @@ async function configureRepositorySources(page: Page) {
     },
   })
   expect(response.ok()).toBeTruthy()
-  const body = await response.json() as { jobIds?: string[] }
-  if (body.jobIds?.length) {
-    await waitForJobs(page.request, body.jobIds)
-  }
+  const body = await response.json() as { jobIds: string[] }
+  await waitForJobs(page.request, body.jobIds)
 }
 
 async function navigateToGraphView(page: Page) {
