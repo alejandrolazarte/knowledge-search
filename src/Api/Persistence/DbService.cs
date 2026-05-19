@@ -46,7 +46,7 @@ internal sealed class DbService : IDbService, IDisposable
     {
     }
 
-    private readonly string _connectionString;
+    private readonly string _readerConnectionString;
 
     public DbService(string dbPath, IReadOnlyList<ConfiguredSource> sources)
     {
@@ -54,15 +54,20 @@ internal sealed class DbService : IDbService, IDisposable
         _roots = NormalizeRoots(rootPaths);
         _rootLabels = BuildRootLabels(_roots);
         _excludesByRoot = BuildExcludesByRoot(_roots, sources);
-        // Pooling=False en la cadena de read porque las conexiones del pool
-        // mantienen archivos abiertos entre tests y rompen la limpieza/recreacion
-        // de schema. El coste de abrir/cerrar una conexion SQLite es minimo.
-        _connectionString = $"Data Source={dbPath};Pooling=False";
+        _readerConnectionString = BuildReaderConnectionString(dbPath);
         _connection = new SqliteConnection($"Data Source={dbPath}");
         _connection.Open();
         ApplyPragmas();
         EnsureSchema();
     }
+
+    /// <summary>
+    /// Devuelve una cadena de conexion para lectores que evita el pool —
+    /// las conexiones pooleadas mantienen archivos abiertos entre tests y
+    /// rompen la limpieza/recreacion de schema.
+    /// </summary>
+    private static string BuildReaderConnectionString(string dbPath) =>
+        $"Data Source={dbPath};Pooling=False";
 
     private static ConfiguredSource BuildKnowledgeSource(string root) =>
         ConfiguredSource.Create(
@@ -89,31 +94,20 @@ internal sealed class DbService : IDbService, IDisposable
 
     // ── IDbService ────────────────────────────────────────────────────────────
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Lectura concurrente con el writer: se usa una conexion separada (sin
+    /// el <c>_connectionLock</c>) y se toma un snapshot lock-free de roots y
+    /// labels. Con <c>journal_mode=WAL</c>, los reads no bloquean al writer
+    /// ni viceversa.
+    /// </summary>
     public IReadOnlyList<SearchResult> Search(
         string query,
         int limit,
         SearchMode modes = SearchMode.Default,
         IReadOnlyList<string>? roots = null)
     {
-        // Lectura: usamos una conexion fresca (del pool de Microsoft.Data.Sqlite)
-        // en lugar de la _connection compartida. Con journal_mode=WAL, los reads
-        // pueden ir en paralelo con el writer y no requieren _connectionLock,
-        // que es lo que hacia que /search se quedara pending durante indexado.
         var ftsQuery = BuildFtsQuery(query, modes);
-
-        // Snapshot lock-free: _roots y _rootLabels se asignan por completo (no
-        // mutan), asi que un read sin lock ve la version vieja O la nueva, no
-        // un estado roto. Tomar el lock aqui anularia el beneficio de la
-        // conexion separada — bloquearia al lector mientras el writer holdea
-        // el lock durante todo el indexado.
-        var rootsSnapshot = _roots;
-        var rootLabelsSnapshot = _rootLabels;
-        var rootFilters = roots is null || roots.Count == 0
-            ? []
-            : rootsSnapshot
-                .Where(root => roots.Contains(rootLabelsSnapshot[root], StringComparer.OrdinalIgnoreCase))
-                .ToArray();
+        var rootFilters = ResolveRootFilters(roots);
 
         if (roots is not null && roots.Count > 0 && rootFilters.Length == 0)
         {
@@ -133,7 +127,7 @@ internal sealed class DbService : IDbService, IDisposable
 
         var results = new List<SearchResult>();
 
-        using var connection = new SqliteConnection(_connectionString);
+        using var connection = new SqliteConnection(_readerConnectionString);
         connection.Open();
         using var command = new SqliteCommand(sql, connection);
         command.Parameters.AddWithValue("@query", ftsQuery);
@@ -160,6 +154,24 @@ internal sealed class DbService : IDbService, IDisposable
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Snapshot lock-free de los root labels para filtrar la busqueda.
+    /// <c>_roots</c> y <c>_rootLabels</c> se reasignan completos (no mutan), asi
+    /// que un read sin lock ve la version vieja o la nueva, nunca un estado roto.
+    /// </summary>
+    private string[] ResolveRootFilters(IReadOnlyList<string>? requestedRoots)
+    {
+        if (requestedRoots is null || requestedRoots.Count == 0)
+        {
+            return [];
+        }
+        var rootsSnapshot = _roots;
+        var labelsSnapshot = _rootLabels;
+        return rootsSnapshot
+            .Where(root => requestedRoots.Contains(labelsSnapshot[root], StringComparer.OrdinalIgnoreCase))
+            .ToArray();
     }
 
     /// <inheritdoc/>
@@ -427,9 +439,12 @@ internal sealed class DbService : IDbService, IDisposable
         UpdateSources(newRoots.Select(BuildKnowledgeSource).ToList());
     }
 
-    // NOTA: solo muta el estado interno (roots + excludes). NO re-indexa — el
-    // re-indexado se encola como job (IndexDocumentsJob) por quien llama, para
-    // no bloquear la peticion HTTP. Vease Program.cs / SaveSourcesUseCase.
+    /// <summary>
+    /// Reconfigura el estado interno (roots + excludes) sin re-indexar.
+    /// El re-indexado se delega al <c>IndexDocumentsJob</c>, encolado por
+    /// quien llama (p.ej. <c>SaveSourcesUseCase</c>), para no bloquear la
+    /// peticion HTTP.
+    /// </summary>
     public void UpdateSources(IReadOnlyList<ConfiguredSource> newSources)
     {
         var rootPaths = newSources.Select(s => s.GetAccessiblePath()).ToList();

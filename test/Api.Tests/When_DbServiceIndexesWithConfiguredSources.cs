@@ -5,10 +5,11 @@ using Xunit;
 
 namespace Api.Tests;
 
-// DbService.IndexDirectories debe respetar los excludes del ConfiguredSource y
-// las exclusiones por defecto (node_modules, bin, .git, etc.). Antes del
-// walker recursivo el filtro era hardcoded a "node_modules" y ".git" y ademas
-// se hacia post-enumeracion (entraba a las ramas excluidas igual).
+/// <summary>
+/// Verifica que <see cref="DbService.IndexDirectories"/> respete los excludes
+/// del <c>ConfiguredSource</c> y las exclusiones por defecto
+/// (<c>node_modules</c>, <c>bin</c>, <c>.git</c>, etc.).
+/// </summary>
 public class When_DbServiceIndexesWithConfiguredSources : IDisposable
 {
     private readonly string _root   = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace KnowledgeSearch.Core.Abstractions.Jobs;
 
-#pragma warning disable CA1711 // "Queue" en el nombre describe la abstraccion mejor que cualquier alternativa
+#pragma warning disable CA1711
 public interface IJobQueue
 #pragma warning restore CA1711
 {

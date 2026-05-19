@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import path from 'path'
+import { waitForJobs } from './helpers/wait-jobs'
 
 const USERS_MS_PATH        = path.join(__dirname, '..', 'fixtures', 'repos', 'users-ms')
 const NOTIFICATIONS_MS_PATH = path.join(__dirname, '..', 'fixtures', 'repos', 'notifications-ms')
@@ -29,6 +30,10 @@ async function configureRepositorySources(page: Page) {
     },
   })
   expect(response.ok()).toBeTruthy()
+  const body = await response.json() as { jobIds?: string[] }
+  if (body.jobIds?.length) {
+    await waitForJobs(page.request, body.jobIds)
+  }
 }
 
 async function navigateToGraphView(page: Page) {

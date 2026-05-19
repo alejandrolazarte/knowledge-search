@@ -4,10 +4,12 @@ using Xunit;
 
 namespace Api.Tests;
 
-// El walker actual usa Directory.EnumerateFiles(root, "*", AllDirectories) y
-// filtra despues con Where(). Eso recorre el arbol entero incluso bajo
-// node_modules/bin/obj. Estos tests aseguran que el walker corta la rama
-// ANTES de bajar.
+/// <summary>
+/// Verifica que el <see cref="RecursiveDirectoryWalker"/> corta las ramas
+/// excluidas antes de descender — a diferencia de
+/// <c>Directory.EnumerateFiles(root, "*", AllDirectories)</c>, que recorre el
+/// arbol entero (incluso <c>node_modules</c>) y filtra despues.
+/// </summary>
 public class When_DirectoryEnumerationSkipsExcludedSubtrees : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -49,8 +51,8 @@ public class When_DirectoryEnumerationSkipsExcludedSubtrees : IDisposable
 
         result.Files.Select(Path.GetFileName).ShouldBe(["Real.cs"]);
 
-        // Solo bajamos a: _root y _root/src. NO a node_modules ni sus 4 descendientes.
-        result.DirectoriesDescended.ShouldBe(2);
+        const int rootPlusSrcOnly = 2;
+        result.DirectoriesDescended.ShouldBe(rootPlusSrcOnly);
     }
 
     [Fact]
@@ -99,8 +101,8 @@ public class When_DirectoryEnumerationSkipsExcludedSubtrees : IDisposable
             ExcludedDirectoryNames: ["node_modules"],
             ExcludeGlobs: []));
 
-        // _root + _root/src
-        result.DirectoriesDescended.ShouldBe(2);
+        const int rootPlusSrcOnly = 2;
+        result.DirectoriesDescended.ShouldBe(rootPlusSrcOnly);
     }
 
     public void Dispose()

@@ -1,10 +1,11 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import path from 'path'
+import { waitForJob, waitForJobs } from './helpers/wait-jobs'
 
 const KNOWLEDGE_PATH = path.join(__dirname, '..', 'fixtures', 'knowledge')
 
 async function configureKnowledgeSource(request: APIRequestContext) {
-  await request.put('/sources', {
+  const saveResponse = await request.put('/sources', {
     data: {
       version: 1,
       sources: [
@@ -19,7 +20,16 @@ async function configureKnowledgeSource(request: APIRequestContext) {
       ],
     },
   })
-  await request.post('/index')
+  expect(saveResponse.ok()).toBeTruthy()
+  const saveBody = await saveResponse.json() as { jobIds?: string[] }
+  if (saveBody.jobIds?.length) {
+    await waitForJobs(request, saveBody.jobIds)
+  }
+
+  const indexResponse = await request.post('/index')
+  expect(indexResponse.ok()).toBeTruthy()
+  const indexBody = await indexResponse.json() as { jobId: string }
+  await waitForJob(request, indexBody.jobId)
 }
 
 test.describe('Knowledge Search', () => {

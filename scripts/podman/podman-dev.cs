@@ -104,25 +104,17 @@ else if (bench)
 }
 else if (test)
 {
-    // Tests en aislamiento: workspace + node_modules de pnpm. No montamos
-    // data-dev/ — los tests no deben heredar SOURCES_CONFIG ni la DB del
-    // entorno dev. KNOWLEDGE_DB se redirige a /tmp para que los tests que
-    // levantan WebApplicationFactory puedan abrir SQLite en un directorio
-    // existente; los tests que requieren aislamiento setean sus propios paths
-    // via in-memory configuration (que pisa los env vars del runtime).
     string[] testVols =
     [
         "-v", $"{root}:/workspace:Z",
         "-v", $"{NodeVolume}:/workspace/app/node_modules",
         "-e", "KNOWLEDGE_DB=/tmp/test-knowledge.db",
     ];
-    // NO pasamos SOURCES_CONFIG: AppConfiguration lo lee como env var con
-    // mayor prioridad que el IConfiguration in-memory, y eso rompe la
-    // hermeticidad de los tests que setean SourcesConfig por test.
     var filterArg = string.IsNullOrEmpty(testFilter) ? "" : $" --filter \"{testFilter}\"";
+    var hermeticPreamble = "unset SOURCES_CONFIG KNOWLEDGE_DIRS && rm -f /tmp/test-knowledge.db";
     Info($"Corriendo tests dentro del contenedor (filter: {testFilter ?? "<none>"})...");
     Exec(["podman", "run", "--rm", ..testVols, Image,
-        "sh", "-c", $"cd /workspace && unset SOURCES_CONFIG KNOWLEDGE_DIRS && rm -f /tmp/test-knowledge.db && dotnet test test/Api.Tests/Api.Tests.csproj --nologo{filterArg}"]);
+        "sh", "-c", $"cd /workspace && {hermeticPreamble} && dotnet test test/Api.Tests/Api.Tests.csproj --nologo{filterArg}"]);
 }
 else
 {

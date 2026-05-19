@@ -5,12 +5,12 @@ using Xunit;
 
 namespace Api.Tests;
 
-// Contrato esperado de IJobQueue:
-//   - EnqueueAsync devuelve un Guid y deja el job en estado Queued.
-//   - El worker (BackgroundService) lo procesa y pasa a Running -> Completed.
-//   - Si el job lanza, el estado es Failed con el mensaje en Error.
-//   - Dos jobs encolados se ejecutan SECUENCIALMENTE (no en paralelo) —
-//     critico para evitar contienda en SQLite.
+/// <summary>
+/// Contrato esperado de <see cref="IJobQueue"/>: <c>EnqueueAsync</c> deja el
+/// job en <c>Queued</c>, el worker lo lleva a <c>Running</c> y luego a
+/// <c>Completed</c> (o <c>Failed</c> con error). Multiples jobs encolados se
+/// ejecutan secuencialmente para evitar contienda en SQLite.
+/// </summary>
 public class When_JobQueueProcessesJobs : IAsyncLifetime, IDisposable
 {
     public void Dispose() => GC.SuppressFinalize(this);

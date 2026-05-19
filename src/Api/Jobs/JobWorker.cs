@@ -8,9 +8,10 @@ public interface IJobContextFactory
     IJobContext Create(Guid jobId);
 }
 
-// Consumidor unico de la cola. Toma jobs uno a uno y los ejecuta hasta
-// terminar antes de pedir el siguiente. Esa serializacion es deliberada:
-// elimina contienda en SQLite y simplifica el manejo de progreso.
+/// <summary>
+/// Consumidor unico de la cola: procesa un job a la vez hasta terminar antes
+/// de pedir el siguiente. La serializacion elimina contienda en SQLite.
+/// </summary>
 public sealed class JobWorker(ChannelJobQueue queue, IJobContextFactory contextFactory) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

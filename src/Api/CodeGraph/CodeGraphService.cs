@@ -272,12 +272,12 @@ internal sealed class CodeGraphService(
         return weights;
     }
 
-    // NOTA: no filtramos por extension en el walker porque la semantica de
-    // CodeGraphService es contar files-without-parser como "FilesSkipped". El
-    // beneficio de rendimiento principal viene de cortar las ramas excluidas
-    // (node_modules, bin...) antes de descender, no de filtrar extensiones —
-    // EnumerateFiles ya devuelve la lista completa de un directorio sin coste
-    // extra por tipo.
+    /// <summary>
+    /// Devuelve todos los ficheros del repo no excluidos por nombre de carpeta
+    /// ni por glob de la fuente. La extension <em>no</em> se filtra aqui:
+    /// CodeGraphService cuenta como <c>FilesSkipped</c> los ficheros que llegan
+    /// sin parser registrado.
+    /// </summary>
     private IReadOnlyList<string> EnumerateSourceFiles(string directoryPath, IReadOnlyList<string> additionalExcludeGlobs)
     {
         return _walker.Enumerate(directoryPath, new DirectoryWalkOptions(

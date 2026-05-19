@@ -2,13 +2,12 @@ using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace KnowledgeSearch;
 
-// Opciones para Enumerate.
-//  - IncludeExtensions: lista de extensiones (con punto) — si esta vacia,
-//    se devuelven todos los ficheros del arbol no excluido.
-//  - ExcludedDirectoryNames: nombres exactos de carpetas a cortar (p.ej.
-//    "node_modules", "bin"). El walker NO baja a estas.
-//  - ExcludeGlobs: patrones glob relativos al root (p.ej. "**/sandbox/**"). Si
-//    el path relativo de un directorio o fichero matchea, se descarta.
+/// <summary>
+/// Configuracion del recorrido. <paramref name="IncludeExtensions"/> vacio devuelve
+/// todos los ficheros del arbol no excluido. <paramref name="ExcludedDirectoryNames"/>
+/// son nombres exactos a cortar (p.ej. <c>node_modules</c>). <paramref name="ExcludeGlobs"/>
+/// son patrones glob relativos al root.
+/// </summary>
 public sealed record DirectoryWalkOptions(
     IReadOnlyList<string> IncludeExtensions,
     IReadOnlyList<string> ExcludedDirectoryNames,
@@ -18,9 +17,11 @@ public sealed record DirectoryWalkResult(
     IReadOnlyList<string> Files,
     long DirectoriesDescended);
 
-// Walker recursivo que CORTA la rama antes de descender — a diferencia de
-// Directory.EnumerateFiles(..., AllDirectories), que entra a node_modules
-// y descarta despues.
+/// <summary>
+/// Walker recursivo que omite ramas excluidas antes de descender, a diferencia
+/// de <c>Directory.EnumerateFiles(..., AllDirectories)</c>, que entra a las
+/// ramas y descarta despues.
+/// </summary>
 public sealed class RecursiveDirectoryWalker
 {
     public DirectoryWalkResult Enumerate(string root, DirectoryWalkOptions options)

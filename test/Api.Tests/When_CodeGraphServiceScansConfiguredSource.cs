@@ -7,8 +7,11 @@ using Xunit;
 
 namespace Api.Tests;
 
-// Asegura que ScanDirectory respete los Excludes definidos en sources.json
-// (campo ConfiguredSource.Excludes), no solo la blocklist hardcoded.
+/// <summary>
+/// Verifica que <see cref="CodeGraphService.ScanDirectory(ConfiguredSource)"/>
+/// respete los <c>Excludes</c> definidos en <c>sources.json</c>, no solo la
+/// blocklist por defecto.
+/// </summary>
 public class When_CodeGraphServiceScansConfiguredSource : IDisposable
 {
     private readonly string _temporaryDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

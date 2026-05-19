@@ -8,15 +8,12 @@ using Xunit.Abstractions;
 
 namespace Api.Tests;
 
-// Benchmark end-to-end de ScanDirectory contra un repo REAL del host. Lee
-// el path desde la env var KNOWLEDGE_SEARCH_BENCH_REPO. Si no esta seteada,
-// se skipea (no aparece en --test normal).
-//
-// Uso esperado: invocar via "dotnet run scripts/podman/podman-dev.cs --
-// --bench <hostRepoPath>", que se encarga de montar el path y setear la
-// env var dentro del container.
-//
-// Ver docs/benchmark.md para el flujo completo de comparacion before/after.
+/// <summary>
+/// Benchmark end-to-end de <see cref="CodeGraphService.ScanDirectory(ConfiguredSource)"/>
+/// contra un repo real del host. Lee el path desde la env var
+/// <c>KNOWLEDGE_SEARCH_BENCH_REPO</c>; si no esta seteada, se autoexcluye y
+/// no participa en <c>--test</c>. Ver <c>docs/benchmark.md</c>.
+/// </summary>
 public class When_CodeGraphServiceBenchesRealRepository : IDisposable
 {
     private const string RepoEnvVar = "KNOWLEDGE_SEARCH_BENCH_REPO";

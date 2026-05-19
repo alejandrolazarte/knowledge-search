@@ -4,12 +4,12 @@ using KnowledgeSearch.Core.Abstractions.Jobs;
 
 namespace KnowledgeSearch;
 
-// Implementacion in-process de IJobQueue basada en System.Threading.Channels.
-//   - Single-consumer: garantiza un solo writer a SQLite a la vez.
-//   - Status en memoria (ConcurrentDictionary). Si se reinicia el proceso, se pierde.
-//
-// Si en el futuro hace falta persistencia, retries con backoff o cron, swap
-// solo de esta clase por una impl Hangfire-like que respete el contrato.
+/// <summary>
+/// Cola in-process de jobs basada en <see cref="Channel{T}"/> con consumidor unico —
+/// garantiza un solo writer a SQLite a la vez. El estado vive en memoria; si se
+/// reinicia el proceso se pierde. Para persistencia/reintentos, reemplazar por
+/// otra implementacion de <see cref="IJobQueue"/>.
+/// </summary>
 #pragma warning disable CA1711
 public sealed class ChannelJobQueue : IJobQueue
 #pragma warning restore CA1711
