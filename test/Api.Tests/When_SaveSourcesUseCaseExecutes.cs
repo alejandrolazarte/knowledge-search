@@ -1,5 +1,5 @@
-using KnowledgeSearch.Core.Abstractions.CodeGraph;
 using KnowledgeSearch.Core.Abstractions.Files;
+using KnowledgeSearch.Core.Abstractions.Jobs;
 using KnowledgeSearch.Core.Abstractions.Search;
 using KnowledgeSearch.Core.Abstractions.Sources;
 using KnowledgeSearch.Core.Common;
@@ -14,7 +14,7 @@ namespace Api.Tests;
 public class When_SaveSourcesUseCaseExecutes
 {
     [Fact]
-    public async Task Then_ItUpdatesDocRootsAndScansCodeSources()
+    public async Task Then_ItUpdatesDocRootsAndEnqueuesJobs()
     {
         var configuration = new SourceConfigurationFile(1, [
             new SourceDefinition(
@@ -41,56 +41,69 @@ public class When_SaveSourcesUseCaseExecutes
 
         var store = new Mock<ISourceConfigurationStore>();
         var documentIndex = new Mock<IDocumentIndex>();
-        var codeScanner = new Mock<ICodeGraphScanner>();
+        var jobQueue = new Mock<IJobQueue>();
+        var indexJobFactory = new Mock<IIndexDocumentsJobFactory>();
+        var scanJobFactory = new Mock<IScanRepositoryJobFactory>();
         var fileSystem = new Mock<IFileSystem>();
 
         var expectedDocsPath = ConfiguredSource.ToAccessiblePath("docs", @"D:\Docs");
         var expectedRepoPath = ConfiguredSource.ToAccessiblePath("repo", @"D:\Repo");
+        var indexJob = new Mock<IJob>();
+        var scanJob  = new Mock<IJob>();
 
-        store.Setup(service => service.Save(configuration)).Returns(Result.Success());
-        store.Setup(service => service.GetConfiguration()).Returns(configuration);
+        store.Setup(s => s.Save(configuration)).Returns(Result.Success());
+        store.Setup(s => s.GetConfiguration()).Returns(configuration);
         fileSystem.Setup(system => system.DirectoryExists(expectedRepoPath)).Returns(true);
+        indexJobFactory.Setup(f => f.Create()).Returns(indexJob.Object);
+        scanJobFactory.Setup(f => f.Create(expectedRepoPath)).Returns(scanJob.Object);
+        jobQueue.Setup(q => q.EnqueueAsync(It.IsAny<IJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Guid.NewGuid());
 
         var useCase = new SaveSourcesUseCase(
             store.Object,
             documentIndex.Object,
-            codeScanner.Object,
+            jobQueue.Object,
+            indexJobFactory.Object,
+            scanJobFactory.Object,
             fileSystem.Object);
 
         var result = await useCase.ExecuteAsync(new SaveSourcesCommand(configuration), CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.ShouldNotBeNull();
-        result.Value.Configuration.ShouldBe(configuration);
-        documentIndex.Verify(index => index.UpdateRoots(It.Is<IReadOnlyList<string>>(roots =>
-            roots.Count == 1 && roots[0] == expectedDocsPath)), Times.Once);
-        codeScanner.Verify(scanner => scanner.ScanDirectory(expectedRepoPath), Times.Once);
+        result.Value!.Configuration.ShouldBe(configuration);
+        result.Value.JobIds.Count.ShouldBe(2);
+        documentIndex.Verify(index => index.UpdateSources(It.Is<IReadOnlyList<ConfiguredSource>>(sources =>
+            sources.Count == 1 && sources[0].GetAccessiblePath() == expectedDocsPath)), Times.Once);
+        jobQueue.Verify(q => q.EnqueueAsync(indexJob.Object, It.IsAny<CancellationToken>()), Times.Once);
+        jobQueue.Verify(q => q.EnqueueAsync(scanJob.Object, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Then_ItReturnsValidationFailureFromStore()
+    public async Task Then_ItReturnsValidationFailureFromStoreWithoutEnqueuing()
     {
         var configuration = new SourceConfigurationFile(1, []);
         var store = new Mock<ISourceConfigurationStore>();
         var documentIndex = new Mock<IDocumentIndex>();
-        var codeScanner = new Mock<ICodeGraphScanner>();
+        var jobQueue = new Mock<IJobQueue>();
+        var indexJobFactory = new Mock<IIndexDocumentsJobFactory>();
+        var scanJobFactory = new Mock<IScanRepositoryJobFactory>();
         var fileSystem = new Mock<IFileSystem>();
 
-        store.Setup(service => service.Save(configuration))
-            .Returns(Result.Validation("id duplicado: docs"));
+        store.Setup(s => s.Save(configuration)).Returns(Result.Validation("id duplicado: docs"));
 
         var useCase = new SaveSourcesUseCase(
             store.Object,
             documentIndex.Object,
-            codeScanner.Object,
+            jobQueue.Object,
+            indexJobFactory.Object,
+            scanJobFactory.Object,
             fileSystem.Object);
 
         var result = await useCase.ExecuteAsync(new SaveSourcesCommand(configuration), CancellationToken.None);
 
         result.IsSuccess.ShouldBeFalse();
-        result.Error.ShouldNotBeNull();
-        result.Error.Message.ShouldBe("id duplicado: docs");
-        documentIndex.Verify(index => index.UpdateRoots(It.IsAny<IReadOnlyList<string>>()), Times.Never);
-        codeScanner.Verify(scanner => scanner.ScanDirectory(It.IsAny<string>()), Times.Never);
+        result.Error!.Message.ShouldBe("id duplicado: docs");
+        documentIndex.Verify(index => index.UpdateSources(It.IsAny<IReadOnlyList<ConfiguredSource>>()), Times.Never);
+        jobQueue.Verify(q => q.EnqueueAsync(It.IsAny<IJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

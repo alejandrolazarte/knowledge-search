@@ -1,4 +1,5 @@
 using KnowledgeSearch.Core.Domain.Search;
+using KnowledgeSearch.Core.Domain.Sources;
 using Microsoft.Data.Sqlite;
 
 namespace KnowledgeSearch;
@@ -6,6 +7,18 @@ namespace KnowledgeSearch;
 internal sealed class DbService : IDbService, IDisposable
 {
     private const int _schemaVersion = 3;
+
+    private static readonly IReadOnlyList<string> DefaultExcludedDirectoryNames =
+    [
+        "node_modules", ".git", "bin", "obj",
+        "dist", "build", "out", "coverage", "TestResults",
+        ".next", ".nuxt", ".turbo", ".cache", ".vite", ".svelte-kit",
+        ".pnpm-store", "storybook-static", ".vs", ".idea",
+    ];
+
+    private static readonly IReadOnlyList<string> MarkdownExtensions = [".md", ".mkd"];
+    private readonly RecursiveDirectoryWalker _walker = new();
+    private Dictionary<string, IReadOnlyList<string>> _excludesByRoot;
 
     private const string _insertSql =
         "INSERT INTO docs(title,section,content,path,line) " +
@@ -29,51 +42,93 @@ internal sealed class DbService : IDbService, IDisposable
     private readonly object _connectionLock = new();
 
     public DbService(string dbPath, IReadOnlyList<string> roots)
+        : this(dbPath, roots.Select(BuildKnowledgeSource).ToList())
     {
-        _roots = NormalizeRoots(roots);
+    }
+
+    private readonly string _readerConnectionString;
+
+    public DbService(string dbPath, IReadOnlyList<ConfiguredSource> sources)
+    {
+        var rootPaths = sources.Select(s => s.GetAccessiblePath()).ToList();
+        _roots = NormalizeRoots(rootPaths);
         _rootLabels = BuildRootLabels(_roots);
+        _excludesByRoot = BuildExcludesByRoot(_roots, sources);
+        _readerConnectionString = BuildReaderConnectionString(dbPath);
         _connection = new SqliteConnection($"Data Source={dbPath}");
         _connection.Open();
         ApplyPragmas();
         EnsureSchema();
     }
 
+    /// <summary>
+    /// Devuelve una cadena de conexion para lectores que evita el pool —
+    /// las conexiones pooleadas mantienen archivos abiertos entre tests y
+    /// rompen la limpieza/recreacion de schema.
+    /// </summary>
+    private static string BuildReaderConnectionString(string dbPath) =>
+        $"Data Source={dbPath};Pooling=False";
+
+    private static ConfiguredSource BuildKnowledgeSource(string root) =>
+        ConfiguredSource.Create(
+            id:       ConfiguredSource.CreateId(root),
+            name:     ConfiguredSource.CreateId(root),
+            kind:     SourceKind.Knowledge,
+            hostPath: root);
+
+    private static Dictionary<string, IReadOnlyList<string>> BuildExcludesByRoot(
+        IReadOnlyList<string> normalizedRoots,
+        IReadOnlyList<ConfiguredSource> sources)
+    {
+        var dict = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in normalizedRoots)
+        {
+            var match = sources.FirstOrDefault(s => string.Equals(
+                s.GetAccessiblePath().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                root,
+                StringComparison.OrdinalIgnoreCase));
+            dict[root] = match?.Excludes ?? [];
+        }
+        return dict;
+    }
+
     // ── IDbService ────────────────────────────────────────────────────────────
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Lectura concurrente con el writer: se usa una conexion separada (sin
+    /// el <c>_connectionLock</c>) y se toma un snapshot lock-free de roots y
+    /// labels. Con <c>journal_mode=WAL</c>, los reads no bloquean al writer
+    /// ni viceversa.
+    /// </summary>
     public IReadOnlyList<SearchResult> Search(
         string query,
         int limit,
         SearchMode modes = SearchMode.Default,
         IReadOnlyList<string>? roots = null)
     {
+        var ftsQuery = BuildFtsQuery(query, modes);
+        var rootFilters = ResolveRootFilters(roots);
+
+        if (roots is not null && roots.Count > 0 && rootFilters.Length == 0)
+        {
+            return [];
+        }
+
+        var sql = _searchSql;
+        if (rootFilters.Length > 0)
+        {
+            var rootPredicates = rootFilters
+                .Select((_, index) => $"path LIKE @root{index} ESCAPE '\\'")
+                .ToArray();
+            sql = _searchSql.Replace(
+                "WHERE docs MATCH @query",
+                $"WHERE docs MATCH @query AND ({string.Join(" OR ", rootPredicates)})");
+        }
+
+        var results = new List<SearchResult>();
+
         lock (_connectionLock)
         {
-            var ftsQuery = BuildFtsQuery(query, modes);
-            var rootFilters = roots is null || roots.Count == 0
-                ? []
-                : _roots
-                    .Where(root => roots.Contains(_rootLabels[root], StringComparer.OrdinalIgnoreCase))
-                    .ToArray();
-
-            if (roots is not null && roots.Count > 0 && rootFilters.Length == 0)
-            {
-                return [];
-            }
-
-            var sql = _searchSql;
-            if (rootFilters.Length > 0)
-            {
-                var rootPredicates = rootFilters
-                    .Select((_, index) => $"path LIKE @root{index} ESCAPE '\\'")
-                    .ToArray();
-                sql = _searchSql.Replace(
-                    "WHERE docs MATCH @query",
-                    $"WHERE docs MATCH @query AND ({string.Join(" OR ", rootPredicates)})");
-            }
-
-            var results = new List<SearchResult>();
-
             using var command = new SqliteCommand(sql, _connection);
             command.Parameters.AddWithValue("@query", ftsQuery);
             command.Parameters.AddWithValue("@limit", limit);
@@ -97,9 +152,27 @@ internal sealed class DbService : IDbService, IDisposable
                     reader.GetString(4),
                     GetRoot(path)));
             }
-
-            return results;
         }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Snapshot lock-free de los root labels para filtrar la busqueda.
+    /// <c>_roots</c> y <c>_rootLabels</c> se reasignan completos (no mutan), asi
+    /// que un read sin lock ve la version vieja o la nueva, nunca un estado roto.
+    /// </summary>
+    private string[] ResolveRootFilters(IReadOnlyList<string>? requestedRoots)
+    {
+        if (requestedRoots is null || requestedRoots.Count == 0)
+        {
+            return [];
+        }
+        var rootsSnapshot = _roots;
+        var labelsSnapshot = _rootLabels;
+        return rootsSnapshot
+            .Where(root => requestedRoots.Contains(labelsSnapshot[root], StringComparer.OrdinalIgnoreCase))
+            .ToArray();
     }
 
     /// <inheritdoc/>
@@ -107,26 +180,13 @@ internal sealed class DbService : IDbService, IDisposable
     {
         lock (_connectionLock)
         {
-            var separator = Path.DirectorySeparatorChar;
-
             var files = _roots
                 .Where(Directory.Exists)
-                .SelectMany(root =>
-                {
-                    try
-                    {
-                        return Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
-                            .Concat(Directory.EnumerateFiles(root, "*.mkd", SearchOption.AllDirectories));
-                    }
-                    catch (DirectoryNotFoundException)
-                    {
-                        return Enumerable.Empty<string>();
-                    }
-                })
+                .SelectMany(root => _walker.Enumerate(root, new DirectoryWalkOptions(
+                    IncludeExtensions:      MarkdownExtensions,
+                    ExcludedDirectoryNames: DefaultExcludedDirectoryNames,
+                    ExcludeGlobs:           _excludesByRoot.GetValueOrDefault(root) ?? [])).Files)
                 .Select(Path.GetFullPath)
-                .Where(filePath =>
-                    !filePath.Contains($"{separator}node_modules{separator}") &&
-                    !filePath.Contains($"{separator}.git{separator}"))
                 .ToHashSet();
 
             var indexed = new HashSet<string>();
@@ -229,14 +289,12 @@ internal sealed class DbService : IDbService, IDisposable
     /// <inheritdoc/>
     public bool IsPathAllowed(string fullPath)
     {
-        lock (_connectionLock)
-        {
-            return _roots.Any(root =>
-                fullPath.StartsWith(
-                    root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                        + Path.DirectorySeparatorChar,
-                    StringComparison.OrdinalIgnoreCase));
-        }
+        var snapshot = _roots;
+        return snapshot.Any(root =>
+            fullPath.StartsWith(
+                root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase));
     }
 
     /// <inheritdoc/>
@@ -312,10 +370,9 @@ internal sealed class DbService : IDbService, IDisposable
     /// <inheritdoc/>
     public IReadOnlyList<string> GetRootNames()
     {
-        lock (_connectionLock)
-        {
-            return _roots.Select(root => _rootLabels[root]).ToList();
-        }
+        var rootsSnapshot = _roots;
+        var labelsSnapshot = _rootLabels;
+        return rootsSnapshot.Select(root => labelsSnapshot[root]).ToList();
     }
 
     /// <inheritdoc/>
@@ -380,13 +437,25 @@ internal sealed class DbService : IDbService, IDisposable
 
     public void UpdateRoots(IReadOnlyList<string> newRoots)
     {
-        var normalized = NormalizeRoots(newRoots);
+        UpdateSources(newRoots.Select(BuildKnowledgeSource).ToList());
+    }
+
+    /// <summary>
+    /// Reconfigura el estado interno (roots + excludes) sin re-indexar.
+    /// El re-indexado se delega al <c>IndexDocumentsJob</c>, encolado por
+    /// quien llama (p.ej. <c>SaveSourcesUseCase</c>), para no bloquear la
+    /// peticion HTTP.
+    /// </summary>
+    public void UpdateSources(IReadOnlyList<ConfiguredSource> newSources)
+    {
+        var rootPaths = newSources.Select(s => s.GetAccessiblePath()).ToList();
+        var normalized = NormalizeRoots(rootPaths);
         lock (_connectionLock)
         {
             _roots = normalized;
             _rootLabels = BuildRootLabels(normalized);
+            _excludesByRoot = BuildExcludesByRoot(normalized, newSources);
         }
-        IndexDirectories();
     }
 
     private static string[] NormalizeRoots(IReadOnlyList<string> roots) =>

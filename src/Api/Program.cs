@@ -1,6 +1,7 @@
 using KnowledgeSearch;
 using KnowledgeSearch.Core.Abstractions.CodeGraph;
 using KnowledgeSearch.Core.Abstractions.Files;
+using KnowledgeSearch.Core.Abstractions.Jobs;
 using KnowledgeSearch.Core.Abstractions.Search;
 using KnowledgeSearch.Core.Abstractions.Sources;
 using KnowledgeSearch.Core.Domain.Sources;
@@ -33,14 +34,13 @@ var sourceConfigService = new SourceConfigurationService(builder.Configuration, 
 builder.Services.AddSingleton<ISourceConfigurationService>(sourceConfigService);
 builder.Services.AddSingleton<ISourceConfigurationStore>(sourceConfigService);
 
-var roots = sourceConfigService.GetConfiguration()
+var docSources = sourceConfigService.GetConfiguration()
     .Sources
     .Select(s => s.ToConfiguredSource())
     .Where(s => s.IndexDocs)
-    .Select(s => s.GetAccessiblePath())
     .ToList();
 
-var dbService = new DbService(dbPath, roots);
+var dbService = new DbService(dbPath, docSources);
 builder.Services.AddSingleton<IDbService>(dbService);
 builder.Services.AddSingleton<IDocumentIndex>(dbService);
 builder.Services.AddSingleton<IDocumentSearchIndex, DocumentSearchIndexAdapter>();
@@ -95,6 +95,15 @@ builder.Services.AddSingleton<SearchCodeDocumentsUseCase>();
 builder.Services.AddSingleton<SearchRepositorySubgraphUseCase>();
 builder.Services.AddSingleton<SearchCrossRepoSubgraphUseCase>();
 builder.Services.AddSingleton<GetCodeFileUseCase>();
+
+builder.Services.AddSingleton<ChannelJobQueue>();
+builder.Services.AddSingleton<IJobQueue>(serviceProvider => serviceProvider.GetRequiredService<ChannelJobQueue>());
+builder.Services.AddSingleton<IJobContextFactory, LogServiceJobContextFactory>();
+builder.Services.AddSingleton<IIndexDocumentsJobFactory, IndexDocumentsJobFactory>();
+builder.Services.AddSingleton<IScanRepositoryJobFactory, ScanRepositoryJobFactory>();
+builder.Services.AddHostedService(serviceProvider => new JobWorker(
+    serviceProvider.GetRequiredService<ChannelJobQueue>(),
+    serviceProvider.GetRequiredService<IJobContextFactory>()));
 
 var app = builder.Build();
 var logger = app.Logger;

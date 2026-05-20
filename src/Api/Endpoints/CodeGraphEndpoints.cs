@@ -1,6 +1,8 @@
+using KnowledgeSearch.Core.Abstractions.Jobs;
 using KnowledgeSearch.Core.Domain.Search;
 
 using KnowledgeSearch.Core.UseCases.CodeGraph;
+using KnowledgeSearch.Core.UseCases.Sources;
 
 namespace KnowledgeSearch;
 
@@ -27,11 +29,20 @@ internal static class CodeGraphEndpoints
 
         app.MapPost("/repos/scan", async (
             ScanDirectoryRequest request,
-            ScanRepositoryUseCase useCase,
+            IJobQueue jobQueue,
+            IScanRepositoryJobFactory jobFactory,
             CancellationToken cancellationToken) =>
         {
-            var result = await useCase.ExecuteAsync(new ScanRepositoryCommand(request.DirectoryPath), cancellationToken);
-            return result.ToHttpResult(Results.Ok);
+            if (string.IsNullOrWhiteSpace(request.DirectoryPath))
+            {
+                return Results.BadRequest(new ErrorResult("El campo directoryPath es requerido."));
+            }
+            if (!Directory.Exists(request.DirectoryPath))
+            {
+                return Results.BadRequest(new ErrorResult($"El directorio no existe: {request.DirectoryPath}"));
+            }
+            var jobId = await jobQueue.EnqueueAsync(jobFactory.Create(request.DirectoryPath), cancellationToken);
+            return Results.Accepted($"/jobs/{jobId}", new EnqueueResponse(jobId));
         });
 
         app.MapPost("/repos/cross-ref", async (

@@ -84,27 +84,19 @@ public class When_RepoEndpointsAreRequested : IDisposable
     }
 
     [Fact]
-    public async Task Then_PostScanReturnsSummaryForExistingDirectory()
+    public async Task Then_PostScanEnqueuesAJobAndReturnsAccepted()
     {
         var existingDirectory = Path.GetTempPath();
-        var scanResult = new CodeGraphScanResult(
-            [new("MyApp.MyClass", "MyClass", CodeNodeKind.Class, "/src/MyClass.cs", 1)],
-            [new("MyApp.MyClass", "IMyClass", CodeEdgeKind.Implements, 1)],
-            FilesScanned: 5,
-            FilesSkipped: 2);
-
-        _mockService.Setup(s => s.ScanDirectory(existingDirectory)).Returns(scanResult);
 
         var response = await _client.PostAsJsonAsync("/repos/scan", new { directoryPath = existingDirectory });
-        var summary = await response.Content.ReadFromJsonAsync<ScanSummaryApiResponse>();
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        summary.ShouldNotBeNull();
-        summary.FilesScanned.ShouldBe(5);
-        summary.FilesSkipped.ShouldBe(2);
-        summary.NodesFound.ShouldBe(1);
-        summary.EdgesFound.ShouldBe(1);
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        var enqueueResponse = await response.Content.ReadFromJsonAsync<EnqueueApiResponse>();
+        enqueueResponse.ShouldNotBeNull();
+        enqueueResponse.JobId.ShouldNotBe(Guid.Empty);
     }
+
+    private sealed record EnqueueApiResponse(Guid JobId);
 
     [Fact]
     public async Task Then_PostScanReturnsBadRequestWhenDirectoryPathIsEmpty()

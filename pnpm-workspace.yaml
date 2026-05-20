@@ -1,6 +1,8 @@
 packages:
   - app
   - e2e
+allowBuilds:
+  esbuild: set this to true or false
 
 minimumReleaseAge: 4320
 virtualStoreDirMaxLength: 60

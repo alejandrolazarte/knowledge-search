@@ -1,6 +1,8 @@
 using KnowledgeSearch.Core.Abstractions.CodeGraph;
 using KnowledgeSearch.Core.Abstractions.Files;
+using KnowledgeSearch.Core.Abstractions.Sources;
 using KnowledgeSearch.Core.Common;
+using KnowledgeSearch.Core.Domain.Sources;
 using KnowledgeSearch.Core.UseCases.CodeGraph;
 using Moq;
 using Shouldly;
@@ -28,7 +30,9 @@ public class When_CodeGraphUseCasesExecute
         var service = new Mock<ICodeGraphSearchService>();
         var fileSystem = new Mock<IFileSystem>();
         fileSystem.Setup(system => system.DirectoryExists(@"D:\Repo")).Returns(false);
-        var useCase = new ScanRepositoryUseCase(service.Object, fileSystem.Object);
+        var sourceStore = new Mock<ISourceConfigurationStore>();
+        sourceStore.Setup(s => s.GetConfiguration()).Returns(new SourceConfigurationFile(1, []));
+        var useCase = new ScanRepositoryUseCase(service.Object, fileSystem.Object, sourceStore.Object);
 
         var result = await useCase.ExecuteAsync(new ScanRepositoryCommand(@"D:\Repo"), CancellationToken.None);
 

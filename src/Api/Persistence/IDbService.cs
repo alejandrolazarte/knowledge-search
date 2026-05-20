@@ -5,6 +5,7 @@ namespace KnowledgeSearch;
 
 internal interface IDbService : IDocumentIndex
 {
+
     /// <summary>
     /// Busca documentos usando cascade phrase → AND → OR según <paramref name="modes"/>.
     /// Si <paramref name="roots"/> está vacío busca en todos los roots configurados.

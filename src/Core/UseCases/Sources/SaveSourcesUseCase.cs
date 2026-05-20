@@ -1,5 +1,6 @@
 using KnowledgeSearch.Core.Abstractions.CodeGraph;
 using KnowledgeSearch.Core.Abstractions.Files;
+using KnowledgeSearch.Core.Abstractions.Jobs;
 using KnowledgeSearch.Core.Abstractions.Search;
 using KnowledgeSearch.Core.Abstractions.Sources;
 using KnowledgeSearch.Core.Common;
@@ -9,23 +10,25 @@ namespace KnowledgeSearch.Core.UseCases.Sources;
 
 public sealed record SaveSourcesCommand(SourceConfigurationFile Configuration);
 
-public sealed record SaveSourcesResponse(SourceConfigurationFile Configuration);
+public sealed record SaveSourcesResponse(SourceConfigurationFile Configuration, IReadOnlyList<Guid> JobIds);
 
 public sealed class SaveSourcesUseCase(
     ISourceConfigurationStore store,
     IDocumentIndex documentIndex,
-    ICodeGraphScanner codeGraphScanner,
+    IJobQueue jobQueue,
+    IIndexDocumentsJobFactory indexJobFactory,
+    IScanRepositoryJobFactory scanJobFactory,
     IFileSystem fileSystem)
     : IUseCase<SaveSourcesCommand, SaveSourcesResponse>
 {
-    public Task<Result<SaveSourcesResponse>> ExecuteAsync(
+    public async Task<Result<SaveSourcesResponse>> ExecuteAsync(
         SaveSourcesCommand command,
         CancellationToken cancellationToken)
     {
         var saveResult = store.Save(command.Configuration);
         if (saveResult.IsFailure)
         {
-            return Task.FromResult<Result<SaveSourcesResponse>>(saveResult.Error!);
+            return saveResult.Error!;
         }
 
         var savedConfig = store.GetConfiguration();
@@ -33,22 +36,34 @@ public sealed class SaveSourcesUseCase(
             .Select(source => source.ToConfiguredSource())
             .ToArray();
 
-        var docRoots = configuredSources
+        var docSources = configuredSources
             .Where(source => source.IndexDocs)
-            .Select(source => source.GetAccessiblePath())
             .ToArray();
 
-        documentIndex.UpdateRoots(docRoots);
+        documentIndex.UpdateSources(docSources);
+
+        var jobIds = new List<Guid>();
+        jobIds.Add(await jobQueue.EnqueueAsync(indexJobFactory.Create(), cancellationToken));
 
         foreach (var source in configuredSources.Where(source => source.IndexCode))
         {
             var accessiblePath = source.GetAccessiblePath();
             if (fileSystem.DirectoryExists(accessiblePath))
             {
-                codeGraphScanner.ScanDirectory(accessiblePath);
+                jobIds.Add(await jobQueue.EnqueueAsync(scanJobFactory.Create(accessiblePath), cancellationToken));
             }
         }
 
-        return Task.FromResult<Result<SaveSourcesResponse>>(new SaveSourcesResponse(savedConfig));
+        return new SaveSourcesResponse(savedConfig, jobIds);
     }
+}
+
+public interface IIndexDocumentsJobFactory
+{
+    IJob Create();
+}
+
+public interface IScanRepositoryJobFactory
+{
+    IJob Create(string directoryPath);
 }

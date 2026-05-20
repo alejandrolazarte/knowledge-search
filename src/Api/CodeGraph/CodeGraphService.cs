@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using KnowledgeSearch.Core.Domain.Sources;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KnowledgeSearch;
@@ -8,23 +9,30 @@ internal sealed class CodeGraphService(
     ICodeGraphRepository repository) : ICodeGraphService
 {
     private readonly IKeyedServiceProvider _keyedServiceProvider = (IKeyedServiceProvider)serviceProvider;
+    private readonly RecursiveDirectoryWalker _walker = new();
 
-    private static readonly HashSet<string> ExcludedDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
-    {
+    private static readonly IReadOnlyList<string> DefaultExcludedDirectoryNames =
+    [
         "node_modules", ".git", "bin", "obj",
         "dist", "build", "out", "coverage", "TestResults",
         ".next", ".nuxt", ".turbo", ".cache", ".vite", ".svelte-kit",
         ".pnpm-store", "storybook-static", ".vs", ".idea",
-    };
+    ];
 
     public CodeGraphScanResult ScanDirectory(string directoryPath)
     {
+        return ScanDirectory(BuildDefaultSource(directoryPath));
+    }
+
+    public CodeGraphScanResult ScanDirectory(ConfiguredSource source)
+    {
+        var directoryPath = source.GetAccessiblePath();
         var allNodes = new ConcurrentBag<CodeNode>();
         var allEdges = new ConcurrentBag<CodeEdge>();
         var filesScanned = 0;
         var filesSkipped = 0;
 
-        var sourceFiles = EnumerateSourceFiles(directoryPath).ToList();
+        var sourceFiles = EnumerateSourceFiles(directoryPath, source.Excludes);
 
         Parallel.ForEach(sourceFiles, filePath =>
         {
@@ -55,6 +63,13 @@ internal sealed class CodeGraphService(
 
         return scanResult;
     }
+
+    private static ConfiguredSource BuildDefaultSource(string directoryPath) =>
+        ConfiguredSource.Create(
+            id:       ConfiguredSource.CreateId(directoryPath),
+            name:     ConfiguredSource.CreateId(directoryPath),
+            kind:     SourceKind.Repository,
+            hostPath: directoryPath);
 
     public CodeSubgraphResult SearchSubgraph(string repositoryName, string query, int depth)
     {
@@ -257,15 +272,17 @@ internal sealed class CodeGraphService(
         return weights;
     }
 
-    private static IEnumerable<string> EnumerateSourceFiles(string directoryPath) =>
-        Directory
-            .EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories)
-            .Where(filePath => !ContainsExcludedDirectory(filePath));
-
-    private static bool ContainsExcludedDirectory(string filePath)
+    /// <summary>
+    /// Devuelve todos los ficheros del repo no excluidos por nombre de carpeta
+    /// ni por glob de la fuente. La extension <em>no</em> se filtra aqui:
+    /// CodeGraphService cuenta como <c>FilesSkipped</c> los ficheros que llegan
+    /// sin parser registrado.
+    /// </summary>
+    private IReadOnlyList<string> EnumerateSourceFiles(string directoryPath, IReadOnlyList<string> additionalExcludeGlobs)
     {
-        var separator = Path.DirectorySeparatorChar;
-        return ExcludedDirectoryNames.Any(excluded =>
-            filePath.Contains($"{separator}{excluded}{separator}", StringComparison.OrdinalIgnoreCase));
+        return _walker.Enumerate(directoryPath, new DirectoryWalkOptions(
+            IncludeExtensions:      [],
+            ExcludedDirectoryNames: DefaultExcludedDirectoryNames,
+            ExcludeGlobs:           additionalExcludeGlobs ?? [])).Files;
     }
 }

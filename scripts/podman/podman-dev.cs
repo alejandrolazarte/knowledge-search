@@ -7,7 +7,12 @@
 //   --build            construye la imagen dev (primera vez o tras cambiar Containerfile.dev)
 //   --install-deps     pnpm install dentro del contenedor (primera vez o tras cambiar package.json)
 //   --build-frontend   pnpm run build dentro del contenedor (tras cambiar app/)
+//   --test [filter]    corre `dotnet test` dentro del contenedor (one-off, --rm)
+//   --bench <path>     corre el test de benchmark de ScanDirectory contra el
+//                      repo en <path> del host (ver docs/benchmark.md)
 //   (sin flags)        arranca dotnet watch con hot reload de .cs
+//
+// Para los tests Playwright e2e usa scripts/podman/podman-e2e.cs.
 //
 // No requiere variables de entorno. Las fuentes se configuran desde la UI de Sources.
 // Variables de entorno opcionales:
@@ -19,9 +24,20 @@ using System.Text.Json;
 var build         = args.Contains("--build");
 var installDeps   = args.Contains("--install-deps");
 var buildFrontend = args.Contains("--build-frontend");
+var test          = args.Contains("--test");
+var testFilter    = test ? args.SkipWhile(a => a != "--test").Skip(1).FirstOrDefault(a => !a.StartsWith("--")) : null;
+var bench         = args.Contains("--bench");
+var benchPath     = bench ? args.SkipWhile(a => a != "--bench").Skip(1).FirstOrDefault(a => !a.StartsWith("--")) : null;
+var detach        = args.Contains("--detach");
 
 var root      = FindRoot();
-var dataDir   = Path.Combine(root, "data");
+var dataDir   = Path.Combine(root, "data-dev");
+Directory.CreateDirectory(dataDir);
+var sourcesJsonPath = Path.Combine(dataDir, "sources.json");
+if (!File.Exists(sourcesJsonPath))
+{
+    File.WriteAllText(sourcesJsonPath, "{\n  \"version\": 1,\n  \"sources\": []\n}\n");
+}
 var sourceMounts = BuildSourceMounts(dataDir);
 var skills    = Environment.GetEnvironmentVariable("SKILLS_DIR")
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
@@ -62,6 +78,46 @@ else if (buildFrontend)
         "sh", "-c", "cd /workspace/app && pnpm run build"]);
     Info("OK — frontend buildeado.");
 }
+else if (bench)
+{
+    if (string.IsNullOrWhiteSpace(benchPath))
+    {
+        Console.Error.WriteLine("--bench requiere el path del repo del host. Ejemplo:");
+        Console.Error.WriteLine("  dotnet run scripts/podman/podman-dev.cs -- --bench <hostRepoPath>");
+        Environment.Exit(1);
+    }
+    var absoluteBenchPath = Path.GetFullPath(benchPath!);
+    if (!Directory.Exists(absoluteBenchPath))
+    {
+        Console.Error.WriteLine($"El path no existe: {absoluteBenchPath}");
+        Environment.Exit(1);
+    }
+    string[] benchVols =
+    [
+        "-v", $"{root}:/workspace:Z",
+        "-v", $"{NodeVolume}:/workspace/app/node_modules",
+        "-v", $"{absoluteBenchPath}:/bench-repo:Z,ro",
+        "-e", "KNOWLEDGE_DB=/tmp/test-knowledge.db",
+        "-e", "KNOWLEDGE_SEARCH_BENCH_REPO=/bench-repo",
+    ];
+    Info($"Benchmark con repo: {absoluteBenchPath}");
+    Exec(["podman", "run", "--rm", ..benchVols, Image,
+        "sh", "-c", "cd /workspace && unset SOURCES_CONFIG KNOWLEDGE_DIRS && rm -f /tmp/test-knowledge.db && dotnet test test/Api.Tests/Api.Tests.csproj --nologo --filter When_CodeGraphServiceBenchesRealRepository --logger \"console;verbosity=detailed\""]);
+}
+else if (test)
+{
+    string[] testVols =
+    [
+        "-v", $"{root}:/workspace:Z",
+        "-v", $"{NodeVolume}:/workspace/app/node_modules",
+        "-e", "KNOWLEDGE_DB=/tmp/test-knowledge.db",
+    ];
+    var filterArg = string.IsNullOrEmpty(testFilter) ? "" : $" --filter \"{testFilter}\"";
+    var hermeticPreamble = "unset SOURCES_CONFIG KNOWLEDGE_DIRS && rm -f /tmp/test-knowledge.db";
+    Info($"Corriendo tests dentro del contenedor (filter: {testFilter ?? "<none>"})...");
+    Exec(["podman", "run", "--rm", ..testVols, Image,
+        "sh", "-c", $"cd /workspace && {hermeticPreamble} && dotnet test test/Api.Tests/Api.Tests.csproj --nologo{filterArg}"]);
+}
 else
 {
     Silent(["podman", "rm", "-f", Container]);
@@ -71,7 +127,8 @@ else
     Console.WriteLine("Para cambios en app/ → en otra terminal:");
     Console.WriteLine("  dotnet run scripts/podman/podman-dev.cs -- --build-frontend");
     Console.ResetColor();
-    Exec(["podman", "run", "-it", "--rm", "--name", Container, "-p", "5112:5111", ..baseVols, Image]);
+    string[] modeFlags = detach ? ["-d"] : ["-it", "--rm"];
+    Exec(["podman", "run", ..modeFlags, "--name", Container, "-p", "5112:5111", ..baseVols, Image]);
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
