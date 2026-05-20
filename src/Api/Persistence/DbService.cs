@@ -127,30 +127,31 @@ internal sealed class DbService : IDbService, IDisposable
 
         var results = new List<SearchResult>();
 
-        using var connection = new SqliteConnection(_readerConnectionString);
-        connection.Open();
-        using var command = new SqliteCommand(sql, connection);
-        command.Parameters.AddWithValue("@query", ftsQuery);
-        command.Parameters.AddWithValue("@limit", limit);
-        for (var i = 0; i < rootFilters.Length; i++)
+        lock (_connectionLock)
         {
-            var prefix = rootFilters[i]
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                + Path.DirectorySeparatorChar;
-            command.Parameters.AddWithValue($"@root{i}", EscapeLike(prefix) + "%");
-        }
+            using var command = new SqliteCommand(sql, _connection);
+            command.Parameters.AddWithValue("@query", ftsQuery);
+            command.Parameters.AddWithValue("@limit", limit);
+            for (var i = 0; i < rootFilters.Length; i++)
+            {
+                var prefix = rootFilters[i]
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                command.Parameters.AddWithValue($"@root{i}", EscapeLike(prefix) + "%");
+            }
 
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            var path = reader.GetString(2);
-            results.Add(new SearchResult(
-                reader.GetString(0),
-                reader.GetString(1),
-                path,
-                reader.GetInt32(3),
-                reader.GetString(4),
-                GetRoot(path)));
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var path = reader.GetString(2);
+                results.Add(new SearchResult(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    path,
+                    reader.GetInt32(3),
+                    reader.GetString(4),
+                    GetRoot(path)));
+            }
         }
 
         return results;

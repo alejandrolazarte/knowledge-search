@@ -12,6 +12,8 @@
 //                      repo en <path> del host (ver docs/benchmark.md)
 //   (sin flags)        arranca dotnet watch con hot reload de .cs
 //
+// Para los tests Playwright e2e usa scripts/podman/podman-e2e.cs.
+//
 // No requiere variables de entorno. Las fuentes se configuran desde la UI de Sources.
 // Variables de entorno opcionales:
 //   SKILLS_DIR  path a los skills de Claude (default: ~/.claude/skills)

@@ -11,6 +11,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 
 WORKDIR /workspace
 
+COPY NuGet.config Directory.Build.props ./
+COPY src/Api/Api.csproj src/Api/
+COPY src/Core/Core.csproj src/Core/
+RUN dotnet restore src/Api/Api.csproj
+
 # Polling en lugar de inotify — necesario para volúmenes Podman en Windows
 ENV DOTNET_USE_POLLING_FILE_WATCHER=true
 ENV ASPNETCORE_URLS=http://+:5111
