@@ -54,7 +54,9 @@ URL: `http://localhost:5111`
 
 ## Active development (editing code)
 
-Source code is edited on the host. Compilation and execution happen inside the container. `node_modules` lives in an isolated Podman volume (`knowledge-search-node_modules`) and never touches the host filesystem.
+Source code is edited on the host. Compilation and execution happen inside the container. `node_modules` (root and `app/`) and the pnpm store live in isolated Podman volumes (`knowledge-search-root-node_modules`, `knowledge-search-node_modules`, `knowledge-search-pnpm-store`) and never touch the host filesystem. The root volume is required to mask the host's (Windows) `node_modules`; otherwise pnpm treats it as satisfied and skips installing the Linux binaries.
+
+For safety, `--install-deps` and `--build-frontend` run with a **minimal** mount set (only `/workspace` + toolchain volumes): no skills, indexed repos, or DB, so a malicious npm package executing during `vite build` cannot reach them. The dev server (`dotnet watch`) does mount skills (rw, for editing from the UI), repos, and DB, because it runs your .NET code, not npm packages.
 
 ```powershell
 dotnet run scripts/podman/podman-dev.cs -- --build --install-deps   # first time setup

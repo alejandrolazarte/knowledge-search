@@ -58,7 +58,9 @@ dotnet run scripts/podman/podman-dev.cs -- --install-deps            # tras camb
 ```
 
 URL: `http://localhost:5112`  
-`node_modules` vive en el volumen Podman `knowledge-search-node_modules` — nunca toca el host.
+`node_modules` (raíz + `app/`) y el store de pnpm viven en volúmenes Podman (`knowledge-search-root-node_modules`, `knowledge-search-node_modules`, `knowledge-search-pnpm-store`) — nunca tocan el host. El volumen de la raíz tapa el `node_modules` del host (Windows); sin él pnpm lo da por satisfecho y no instala los binarios Linux.
+
+Seguridad: `--install-deps` y `--build-frontend` montan solo `/workspace` + volúmenes de toolchain (sin skills/repos/DB) para aislar paquetes npm maliciosos en el build; el dev server sí monta skills (rw), repos y DB porque corre código .NET propio.
 
 ## Tests (permitidos sin aprobación, corren en el host)
 

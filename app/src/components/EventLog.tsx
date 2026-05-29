@@ -12,6 +12,8 @@ interface Props {
   collapsed: boolean
 }
 
+const isJobEvent = (ev: LogEvent) => ev.type.startsWith('job:')
+
 export function EventLog({ collapsed }: Props) {
   const [events,  setEvents]  = useState<LogEvent[]>([])
   const [unread,  setUnread]  = useState(0)
@@ -22,7 +24,7 @@ export function EventLog({ collapsed }: Props) {
   useEffect(() => {
     fetch('/log')
       .then(r => r.json())
-      .then((data: LogEvent[]) => setEvents(data))
+      .then((data: LogEvent[]) => setEvents(data.filter(ev => !isJobEvent(ev))))
       .catch(() => {})
   }, [])
 
@@ -31,13 +33,14 @@ export function EventLog({ collapsed }: Props) {
     const syncLog = () =>
       fetch('/log')
         .then(r => r.json())
-        .then((data: LogEvent[]) => setEvents(data))
+        .then((data: LogEvent[]) => setEvents(data.filter(ev => !isJobEvent(ev))))
         .catch(() => {})
 
     const es = new EventSource('/events')
 
     es.onmessage = e => {
       const ev: LogEvent = JSON.parse(e.data)
+      if (isJobEvent(ev)) return
       setEvents(prev => [...prev.slice(-99), ev])
       setUnread(n => n + 1)
     }
