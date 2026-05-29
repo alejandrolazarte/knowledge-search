@@ -38,7 +38,9 @@ Abre `http://localhost:5111`.
 
 ## Desarrollo activo
 
-El source se edita en el host con tu editor. `dotnet watch`, `pnpm install` y `pnpm run build` corren dentro del contenedor. Los `node_modules` viven en un volumen Podman aislado (`knowledge-search-node_modules`) y nunca tocan el host.
+El source se edita en el host con tu editor. `dotnet watch`, `pnpm install` y `pnpm run build` corren dentro del contenedor. Los `node_modules` (raíz y `app/`) y el store de pnpm viven en volúmenes Podman aislados (`knowledge-search-root-node_modules`, `knowledge-search-node_modules`, `knowledge-search-pnpm-store`) y nunca tocan el host. El de la raíz es necesario para tapar el `node_modules` del host (Windows): si no, pnpm lo da por satisfecho y no instala los binarios Linux.
+
+Por seguridad, `--install-deps` y `--build-frontend` corren con un set **mínimo** de mounts (solo `/workspace` + volúmenes de toolchain): no montan skills, repos indexados ni la DB, para que un paquete npm malicioso ejecutándose en `vite build` no los alcance. El dev server (`dotnet watch`) sí monta skills (rw, para editarlas desde la UI), repos y DB, porque corre tu código .NET, no paquetes npm.
 
 ```powershell
 dotnet run scripts/podman/podman-dev.cs -- --build --install-deps   # primera vez

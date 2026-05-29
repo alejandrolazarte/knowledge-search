@@ -42,14 +42,31 @@ var sourceMounts = BuildSourceMounts(dataDir);
 var skills    = Environment.GetEnvironmentVariable("SKILLS_DIR")
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
 
-const string Image      = "localhost/knowledge-search-dev";
-const string Container  = "knowledge-search-dev";
-const string NodeVolume = "knowledge-search-node_modules";
+const string Image          = "localhost/knowledge-search-dev";
+const string Container      = "knowledge-search-dev";
+const string NodeVolume     = "knowledge-search-node_modules";
+const string RootNodeVolume = "knowledge-search-root-node_modules";
+const string PnpmStoreVolume = "knowledge-search-pnpm-store";
 
-string[] baseVols =
+// Mounts mínimos para instalar/buildear dependencias: solo el workspace y los
+// volúmenes de toolchain. SIN skills, SIN repos indexados, SIN la DB — así un
+// paquete npm malicioso que se ejecute durante `vite build` no los alcanza.
+string[] buildVols =
 [
     "-v", $"{root}:/workspace:Z",
+    // Tapamos el node_modules de la raíz (host Windows) con un volumen Linux propio;
+    // si no, pnpm lo da por satisfecho y nunca instala los binarios Linux en app/node_modules.
+    "-v", $"{RootNodeVolume}:/workspace/node_modules",
     "-v", $"{NodeVolume}:/workspace/app/node_modules",
+    "-v", $"{PnpmStoreVolume}:/pnpm-store",
+];
+
+// El dev server corre tu código .NET (confiable, no ejecuta node_modules) y sí
+// necesita skills (lectura + edición desde la UI vía PUT /skill-file), los repos
+// a indexar y la DB.
+string[] runVols =
+[
+    ..buildVols,
     "-v", $"{dataDir}:/data/db:Z",
     ..sourceMounts,
     "-v", $"{skills}:/data/skills:Z",
@@ -63,18 +80,22 @@ if (build)
 }
 
 Silent(["podman", "volume", "create", NodeVolume]);
+Silent(["podman", "volume", "create", RootNodeVolume]);
+Silent(["podman", "volume", "create", PnpmStoreVolume]);
 
 if (installDeps)
 {
     Info("Instalando dependencias dentro del contenedor...");
-    Exec(["podman", "run", "--rm", ..baseVols, Image,
-        "sh", "-c", "cd /workspace/app && pnpm install --frozen-lockfile --ignore-scripts"]);
+    // Instala el workspace completo desde la raíz para poblar los .bin Linux
+    // en ambos volúmenes (raíz y app); --force evita falsos "already up to date".
+    Exec(["podman", "run", "--rm", ..buildVols, Image,
+        "sh", "-c", "cd /workspace && pnpm config set store-dir /pnpm-store && pnpm install --force --ignore-scripts"]);
     Info("OK — dependencias instaladas.");
 }
 else if (buildFrontend)
 {
     Info("Buildeando frontend dentro del contenedor...");
-    Exec(["podman", "run", "--rm", ..baseVols, Image,
+    Exec(["podman", "run", "--rm", ..buildVols, Image,
         "sh", "-c", "cd /workspace/app && pnpm run build"]);
     Info("OK — frontend buildeado.");
 }
@@ -128,7 +149,7 @@ else
     Console.WriteLine("  dotnet run scripts/podman/podman-dev.cs -- --build-frontend");
     Console.ResetColor();
     string[] modeFlags = detach ? ["-d"] : ["-it", "--rm"];
-    Exec(["podman", "run", ..modeFlags, "--name", Container, "-p", "5112:5111", ..baseVols, Image]);
+    Exec(["podman", "run", ..modeFlags, "--name", Container, "-p", "5112:5111", ..runVols, Image]);
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
